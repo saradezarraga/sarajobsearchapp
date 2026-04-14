@@ -254,7 +254,7 @@ export default function App() {
       const res = await callClaude(
         `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n{{TAILORING_RULES}}\n\nSOURCE MATERIAL:\n{{SOURCE_MATERIAL}}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords.`,
         `Tailor Sara's resume for this role.\n\nMASTER RESUME:\n{{MASTER_RESUME}}\n\nJOB DESCRIPTION:\n${jdText || "Role: " + role + " at " + company}\n\nCOMPANY: ${company}\nROLE: ${role}\n\nRewrite ONLY Headline Summary and Relevant Accomplishments (3-5 max). Output the full resume.`,
-        2000,
+        4000,
         true
       );
       setTailored(res); setEditResume(false); setLoading(false); setStep(3);
