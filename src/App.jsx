@@ -11,7 +11,7 @@ const DEFAULT_HUNTER_KEY = "ENTER_YOUR_HUNTER_KEY_HERE";
 async function callClaude(sys, msg, maxTokens = 4000, mcp = []) {
   const body = { model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system: sys, messages: [{ role: "user", content: msg }] };
   if (mcp.length) body.mcp_servers = mcp;
-  const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch("/.netlify/functions/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
