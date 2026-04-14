@@ -5,3 +5,6 @@
 
 [functions."claude"]
   timeout = 60
+
+[functions."generate-resume"]
+  timeout = 60

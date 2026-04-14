@@ -279,8 +279,24 @@ export default function App() {
     } catch (e) { setLoading(false); alert(e.message); }
   };
 
+  const [driveLinks, setDriveLinks] = useState({ docxUrl: null, pdfUrl: null, fileName: null });
+
   const step4 = async () => {
-    setLoading(true); setLoadMsg("Drafting referral emails…");
+    setLoading(true); setLoadMsg("Saving resume to Google Drive…");
+    try {
+      const saveRes = await fetch("/.netlify/functions/generate-resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText: tailored, company, role })
+      });
+      const saveData = await saveRes.json();
+      if (saveData.error) throw new Error(saveData.error);
+      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName });
+    } catch (e) {
+      console.error("Drive save failed:", e.message);
+      // Continue even if save fails
+    }
+    setLoadMsg("Drafting referral emails…");
     try {
       const results = await Promise.all(ordered.map(async c => {
         const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
@@ -512,7 +528,13 @@ export default function App() {
                         <button className="btn btn-gh" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => setEditResume(!editResume)}>{editResume ? "Preview" : "✏ Edit"}</button>
                       </div>
                       {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev" dangerouslySetInnerHTML={{__html: renderMarkdown(tailored)}} />}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={step4}>Approve & Draft Emails →</button></div>
+                      {driveLinks.docxUrl && (
+        <div style={{ display:"flex", gap:10, margin:"12px 0", flexWrap:"wrap" }}>
+          <a href={driveLinks.docxUrl} target="_blank" rel="noreferrer" className="btn btn-sec" style={{fontSize:13}}>📄 Open Word Doc in Drive</a>
+          <a href={driveLinks.pdfUrl} target="_blank" rel="noreferrer" className="btn btn-sec" style={{fontSize:13}}>📋 Open PDF in Drive</a>
+        </div>
+      )}
+      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={step4}>Approve & Draft Emails →</button></div>
                     </>
                   )}
                   {step === 4 && (
