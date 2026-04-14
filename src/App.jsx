@@ -6,6 +6,24 @@ const DRIVE_FILE_IDS = {
   tailoringRules: "1jJ9s2ket9MmTYcpWbU8jhjlqBcieDmC1JpqYZo6rA7o",
 };
 const STORAGE_KEY = "jsa_v1";
+
+function renderMarkdown(text) {
+  if (!text) return "";
+  return text
+    .replace(/^# (.+)$/gm, '<h1 style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;margin:0 0 4px">$1</h1>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;color:#5a5a7a">$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:13px;font-weight:700;margin:12px 0 6px">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^(\d+\. )(.+)$/gm, '<div style="margin-bottom:10px"><strong>$1</strong>$2</div>')
+    .replace(/^- (.+)$/gm, '<div style="padding-left:16px;margin-bottom:3px">• $1</div>')
+    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e2ddd5;margin:12px 0"/>')
+    .replace(/
+
+/g, '<br/><br/>')
+    .replace(/
+/g, '<br/>');
+}
 const DEFAULT_HUNTER_KEY = "ENTER_YOUR_HUNTER_KEY_HERE";
 
 async function callClaude(sys, msg, maxTokens = 4000, injectDocs = false) {
@@ -252,7 +270,7 @@ export default function App() {
     try {
       const docs = await loadDrive();
       const res = await callClaude(
-        `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n{{TAILORING_RULES}}\n\nSOURCE MATERIAL:\n{{SOURCE_MATERIAL}}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords.`,
+        `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n{{TAILORING_RULES}}\n\nSOURCE MATERIAL:\n{{SOURCE_MATERIAL}}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords. Use clean markdown: # for name, ## for section headers, numbered list for accomplishments with italic titles using *title*: format.`,
         `Tailor Sara's resume for this role.\n\nMASTER RESUME:\n{{MASTER_RESUME}}\n\nJOB DESCRIPTION:\n${jdText || "Role: " + role + " at " + company}\n\nCOMPANY: ${company}\nROLE: ${role}\n\nRewrite ONLY Headline Summary and Relevant Accomplishments (3-5 max). Output the full resume.`,
         4000,
         true
@@ -493,7 +511,7 @@ export default function App() {
                         <div className="dl">Tailored Resume — {company}</div>
                         <button className="btn btn-gh" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => setEditResume(!editResume)}>{editResume ? "Preview" : "✏ Edit"}</button>
                       </div>
-                      {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev">{tailored}</div>}
+                      {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev" dangerouslySetInnerHTML={{__html: renderMarkdown(tailored)}} />}
                       <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={step4}>Approve & Draft Emails →</button></div>
                     </>
                   )}
