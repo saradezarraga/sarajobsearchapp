@@ -8,9 +8,9 @@ const DRIVE_FILE_IDS = {
 const STORAGE_KEY = "jsa_v1";
 const DEFAULT_HUNTER_KEY = "ENTER_YOUR_HUNTER_KEY_HERE";
 
-async function callClaude(sys, msg, maxTokens = 4000, mcp = []) {
+async function callClaude(sys, msg, maxTokens = 4000, injectDocs = false) {
   const body = { model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system: sys, messages: [{ role: "user", content: msg }] };
-  if (mcp.length) body.mcp_servers = mcp;
+  if (injectDocs) body.injectDocs = true;
   const res = await fetch("/.netlify/functions/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
@@ -198,24 +198,8 @@ export default function App() {
   const setAndSaveJobs = (j) => { setJobs(j); save(j); };
 
   const loadDrive = async () => {
-    if (driveContent) return driveContent;
-    setLoadMsg("Loading your documents from Google Drive…");
-    const result = await callClaude(
-      `Fetch Google Drive files and return their content as JSON only. Return ONLY valid JSON with keys: masterResume, sourceMaterial, tailoringRules. No preamble, no markdown.`,
-      `Fetch these files and return full text as JSON:
-- "masterResume": file ID ${DRIVE_FILE_IDS.masterResume}
-- "sourceMaterial": file ID ${DRIVE_FILE_IDS.sourceMaterial}
-- "tailoringRules": file ID ${DRIVE_FILE_IDS.tailoringRules}`,
-      8000,
-      [{ type: "url", url: "https://drivemcp.googleapis.com/mcp/v1", name: "gdrive" }]
-    );
-    let parsed = { masterResume: "", sourceMaterial: "", tailoringRules: "" };
-    try {
-      const clean = result.replace(/```json|```/g, "").trim();
-      parsed = JSON.parse(clean.slice(clean.indexOf("{")));
-    } catch {}
-    setDriveContent(parsed);
-    return parsed;
+    // Docs baked into Netlify function
+    return { masterResume: "{{MASTER_RESUME}}", sourceMaterial: "{{SOURCE_MATERIAL}}", tailoringRules: "{{TAILORING_RULES}}" };
   };
 
   useEffect(() => {
@@ -268,9 +252,10 @@ export default function App() {
     try {
       const docs = await loadDrive();
       const res = await callClaude(
-        `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n${docs.tailoringRules}\n\nSOURCE MATERIAL:\n${docs.sourceMaterial}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords.`,
-        `Tailor Sara's resume for this role.\n\nMASTER RESUME:\n${docs.masterResume}\n\nJOB DESCRIPTION:\n${jdText || "Role: " + role + " at " + company}\n\nCOMPANY: ${company}\nROLE: ${role}\n\nRewrite ONLY Headline Summary and Relevant Accomplishments (3-5 max). Output the full resume.`,
-        4000
+        `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n{{TAILORING_RULES}}\n\nSOURCE MATERIAL:\n{{SOURCE_MATERIAL}}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords.`,
+        `Tailor Sara's resume for this role.\n\nMASTER RESUME:\n{{MASTER_RESUME}}\n\nJOB DESCRIPTION:\n${jdText || "Role: " + role + " at " + company}\n\nCOMPANY: ${company}\nROLE: ${role}\n\nRewrite ONLY Headline Summary and Relevant Accomplishments (3-5 max). Output the full resume.`,
+        4000,
+        true
       );
       setTailored(res); setEditResume(false); setLoading(false); setStep(3);
     } catch (e) { setLoading(false); alert(e.message); }
