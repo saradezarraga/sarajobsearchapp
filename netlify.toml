@@ -2,3 +2,6 @@
   command = "npm install && npm run build"
   publish = "dist"
   functions = "netlify/functions"
+
+[functions."claude"]
+  timeout = 26
