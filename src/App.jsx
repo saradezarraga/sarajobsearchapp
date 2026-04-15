@@ -317,6 +317,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   };
 
   const [driveLinks, setDriveLinks] = useState({ docxUrl: null, pdfUrl: null, fileName: null });
+  const [savedTemplates, setSavedTemplates] = useState(null);
 
   const saveResumeToDrive = async () => {
     setLoading(true); setLoadMsg("Copying master resume and editing sections…");
@@ -339,6 +340,16 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
   const step5 = async () => {
     setLoading(true); setLoadMsg("Drafting referral emails…");
+    // Load saved email templates from Drive if available
+    let templateContext = "";
+    try {
+      const tplRes = await fetch("/.netlify/functions/load-email-templates");
+      const tplData = await tplRes.json();
+      if (tplData.content) {
+        templateContext = `\n\nSAVED EMAIL TEMPLATES (use these as your base language, adapt for this specific contact/company):\n${tplData.content}`;
+        setSavedTemplates(tplData.content);
+      }
+    } catch (e) { /* no templates saved yet, generate fresh */ }
     try {
       const results = await Promise.all(ordered.map(async c => {
         const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
@@ -352,6 +363,38 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       setDrafts(results); setLoading(false); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }
   };
+
+  const EMAIL_TEMPLATES_DOC_ID = "1bgH8z661NFFobZZjygQZ7kjgrXDqaI65LnDq7laCUpQ";
+
+  const saveAsTemplate = async () => {
+    try {
+      const body = JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 100,
+        messages: [{ role: "user", content: "ok" }]
+      });
+      // Use a Netlify function to write to Drive
+      const res = await fetch("/.netlify/functions/save-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docId: EMAIL_TEMPLATES_DOC_ID,
+          templates: {
+            firstDegree: drafts[0]?.edited || drafts[0]?.body || "",
+            alumni: drafts[1]?.edited || drafts[1]?.body || "",
+            both: drafts[2]?.edited || drafts[2]?.body || ""
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert("Templates saved! Future emails will use these as a base.");
+    } catch (e) {
+      alert("Failed to save templates: " + e.message);
+    }
+  };
+
+
 
   const launch = async () => {
     setLoading(true); setLoadMsg("Looking up email addresses and saving data…");
@@ -607,7 +650,11 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                           <div className="em-ft">📎 Tailored Resume — {company}.pdf · attached</div>
                         </div>
                       ))}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(4)}>← Back</button><button className="btn btn-pri" onClick={launch}>🚀 Launch Sequence</button></div>
+                      <div className="btn-row">
+                        <button className="btn btn-gh" onClick={() => setStep(4)}>← Back</button>
+                        <button className="btn btn-sec" onClick={saveAsTemplate} style={{marginRight:8}}>💾 Save as Template</button>
+                        <button className="btn btn-pri" onClick={launch}>🚀 Launch Sequence</button>
+                      </div>
                     </>
                   )}
                 </div>
