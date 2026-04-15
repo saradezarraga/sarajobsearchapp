@@ -10,14 +10,15 @@ const STORAGE_KEY = "jsa_v1";
 function renderMarkdown(text) {
   if (!text) return "";
   return text
-    .replace(/^# (.+)$/gm, "<h1 style=\"font-family:Georgia,serif;font-size:18px;font-weight:700;margin:0 0 4px\">$1</h1>")
-    .replace(/^## (.+)$/gm, "<h2 style=\"font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 6px;color:#5a5a7a\">$1</h2>")
-    .replace(/^### (.+)$/gm, "<h3 style=\"font-size:13px;font-weight:700;margin:10px 0 4px\">$1</h3>")
+    .replace(/^# (.+)$/gm, "<h1 style='font-family:Georgia,serif;font-size:18px;font-weight:700;margin:0 0 4px'>$1</h1>")
+    .replace(/^## (.+)$/gm, "<h2 style='font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 6px;color:#5a5a7a'>$1</h2>")
+    .replace(/^### (.+)$/gm, "<h3 style='font-size:13px;font-weight:700;margin:10px 0 4px'>$1</h3>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^(\d+\. )(.+)$/gm, "<div style=\"margin-bottom:10px\"><strong>$1</strong>$2</div>")
-    .replace(/^- (.+)$/gm, "<div style=\"padding-left:16px;margin-bottom:3px\">&bull; $1</div>")
-    .replace(/^---+$/gm, "<hr style=\"border:none;border-top:1px solid #e2ddd5;margin:12px 0\"/>")
+    .replace(/^(\d+)\. \*(.+?)\*: (.+)$/gm, "<div style='margin-bottom:10px'><strong>$1. <em>$2</em>:</strong> $3</div>")
+    .replace(/^(\d+)\. (.+)$/gm, "<div style='margin-bottom:10px'><strong>$1.</strong> $2</div>")
+    .replace(/^[-] (.+)$/gm, "<div style='padding-left:16px;margin-bottom:3px'>&bull; $1</div>")
+    .replace(/---+/g, "<hr style='border:none;border-top:1px solid #e2ddd5;margin:10px 0'/>")
     .replace(/\n\n/g, "<br/><br/>")
     .replace(/\n/g, "<br/>");
 }
