@@ -308,7 +308,7 @@ ACCOMPLISHMENTS:
 4. [Title]: [Body text]
 5. [Title]: [Body text]
 
-Select 3-5 accomplishments based on role fit. Each title should mirror the job description language. Each body is 4-7 sentences. First person throughout.`,
+Select 3-5 accomplishments based on role fit. Each title should mirror the job description language. Each body is 4-7 sentences maximum. First person throughout. IMPORTANT: Total word count for headline + all accomplishments must not exceed 550 words. Be concise — no padding, no redundancy. If 5 accomplishments push over the limit, use 4.`,
         4000,
         true
       );
