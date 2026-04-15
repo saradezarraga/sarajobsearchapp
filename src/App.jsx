@@ -318,6 +318,26 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
   const [driveLinks, setDriveLinks] = useState({ docxUrl: null, pdfUrl: null, fileName: null });
   const [savedTemplates, setSavedTemplates] = useState(null);
+  const [gmailConnected, setGmailConnected] = useState(null); // null=loading, true, false
+
+  useEffect(() => {
+    // Check Gmail auth status
+    fetch("/.netlify/functions/gmail-auth-status")
+      .then(r => r.json())
+      .then(d => setGmailConnected(d.connected))
+      .catch(() => setGmailConnected(false));
+    // Handle OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    const authResult = params.get("gmail_auth");
+    if (authResult === "success") {
+      setGmailConnected(true);
+      window.history.replaceState({}, "", "/");
+      alert("✓ Gmail connected successfully! The app can now send emails on your behalf.");
+    } else if (authResult === "error") {
+      window.history.replaceState({}, "", "/");
+      alert("Gmail connection failed: " + (params.get("reason") || "Unknown error"));
+    }
+  }, []);
 
   const saveResumeToDrive = async () => {
     setLoading(true); setLoadMsg("Copying master resume and editing sections…");
@@ -686,14 +706,14 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             </>
           )}
 
-          {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
+          {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} gmailConnected={gmailConnected} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
         </main>
       </div>
     </>
   );
 }
 
-function SettingsView({ hunterKey, liContacts, onSave }) {
+function SettingsView({ hunterKey, liContacts, gmailConnected, onSave }) {
   const [k, setK] = useState(hunterKey);
   const [contacts, setContacts] = useState(liContacts);
   const [saved, setSaved] = useState(false);
@@ -713,6 +733,20 @@ function SettingsView({ hunterKey, liContacts, onSave }) {
           </div>
         </div>
         <div className="ss"><div className="ss-t">Google Drive Documents</div><div style={{ fontSize: 13, color: "var(--ink-l)", lineHeight: 1.8 }}><div>📄 <strong>Master Resume</strong> — connected</div><div>📄 <strong>Source Material for Resume Tailoring</strong> — connected</div><div>📄 <strong>Resume Tailoring Rules</strong> — connected</div><div style={{ marginTop: 10, fontSize: 11 }}>Update directly in Google Drive. Changes reflect automatically.</div></div></div>
+        <div className="ss">
+          <div className="ss-t">Gmail</div>
+          <div style={{fontSize:13,color:"var(--ink-l)",lineHeight:1.7,marginBottom:12}}>Connect your Gmail account so the app can send emails on your behalf with your resume attached.</div>
+          {gmailConnected === null && <div style={{fontSize:13,color:"var(--ink-l)"}}>Checking connection…</div>}
+          {gmailConnected === true && (
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <span style={{color:"#2a7a4b",fontWeight:600,fontSize:13}}>✓ Gmail connected</span>
+              <a href="/.netlify/functions/gmail-auth-start" className="btn btn-gh" style={{fontSize:12,textDecoration:"none"}}>Reconnect</a>
+            </div>
+          )}
+          {gmailConnected === false && (
+            <a href="/.netlify/functions/gmail-auth-start" className="btn btn-pri" style={{display:"inline-block",textDecoration:"none"}}>Connect Gmail →</a>
+          )}
+        </div>
         <div className="ss"><div className="ss-t">Career Coach Access</div><div style={{ fontSize: 13, color: "var(--ink-l)", lineHeight: 1.7, marginBottom: 12 }}>Share a read-only view of your dashboard with your coach.</div><button className="btn btn-sec">📋 Copy Coach View Link</button></div>
       </div>
       <div className="btn-row mt16"><button className="btn btn-pri" onClick={() => { onSave(k, contacts); setSaved(true); setTimeout(() => setSaved(false), 2000); }}>{saved ? "✓ Saved" : "Save Settings"}</button></div>

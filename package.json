@@ -7,6 +7,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.4",
     "docx": "^9.6.1",
     "googleapis": "^171.4.0",
     "jszip": "^3.10.1",
