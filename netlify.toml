@@ -8,3 +8,8 @@
 
 [functions."generate-resume"]
   timeout = 60
+
+[[redirects]]
+  from = "/auth/callback"
+  to = "/.netlify/functions/gmail-auth-callback"
+  status = 200
