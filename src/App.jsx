@@ -318,8 +318,8 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
   const [driveLinks, setDriveLinks] = useState({ docxUrl: null, pdfUrl: null, fileName: null });
 
-  const step4 = async () => {
-    setLoading(true); setLoadMsg("Saving resume to Google Drive…");
+  const saveResumeToDrive = async () => {
+    setLoading(true); setLoadMsg("Copying master resume and editing sections…");
     try {
       const saveRes = await fetch("/.netlify/functions/generate-resume", {
         method: "POST",
@@ -329,11 +329,16 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       const saveData = await saveRes.json();
       if (saveData.error) throw new Error(saveData.error);
       setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName });
+      setLoading(false);
+      setStep(4);
     } catch (e) {
-      console.error("Drive save failed:", e.message);
-      // Continue even if save fails
+      setLoading(false);
+      alert("Drive save failed: " + e.message);
     }
-    setLoadMsg("Drafting referral emails…");
+  };
+
+  const step5 = async () => {
+    setLoading(true); setLoadMsg("Drafting referral emails…");
     try {
       const results = await Promise.all(ordered.map(async c => {
         const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
@@ -344,7 +349,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         );
         return { contact: c, draft: d, edited: d, editing: false };
       }));
-      setDrafts(results); setLoading(false); setStep(4);
+      setDrafts(results); setLoading(false); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }
   };
 
@@ -377,7 +382,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   const onDragEnd = () => setDragI(null);
   const addManual = () => { if (!newC.name.trim()) return; setManContacts(p => [...p, { ...newC }]); setNewC({ name: "", title: "", dept: "", linkedinUrl: "", type: "alumni" }); };
 
-  const STEPS = ["Job Details", "Contacts", "Order", "Resume", "Emails"];
+  const STEPS = ["Job Details", "Contacts", "Order", "Resume", "Preview", "Emails"];
 
   return (
     <>
@@ -565,16 +570,31 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                         <button className="btn btn-gh" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => setEditResume(!editResume)}>{editResume ? "Preview" : "✏ Edit"}</button>
                       </div>
                       {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev" dangerouslySetInnerHTML={{__html: renderMarkdown(tailored)}} />}
-                      {driveLinks.docxUrl && (
-        <div style={{ display:"flex", gap:10, margin:"12px 0", flexWrap:"wrap" }}>
-          <a href={driveLinks.docxUrl} target="_blank" rel="noreferrer" className="btn btn-sec" style={{fontSize:13}}>📄 Open Word Doc in Drive</a>
-          <a href={driveLinks.pdfUrl} target="_blank" rel="noreferrer" className="btn btn-sec" style={{fontSize:13}}>📋 Open PDF in Drive</a>
-        </div>
-      )}
-      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={step4}>Approve & Draft Emails →</button></div>
+                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={saveResumeToDrive}>Approve Text & Save Resume →</button></div>
                     </>
                   )}
                   {step === 4 && (
+                    <>
+                      <div className="dl" style={{marginBottom:12}}>Review your tailored resume before sending. Open both files and confirm the formatting looks right.</div>
+                      {driveLinks.docxUrl ? (
+                        <div style={{display:"flex",gap:12,flexWrap:"wrap",margin:"16px 0"}}>
+                          <a href={driveLinks.docxUrl} target="_blank" rel="noreferrer" className="btn btn-sec">📄 Open Word Doc in Drive ↗</a>
+                          <a href={driveLinks.pdfUrl} target="_blank" rel="noreferrer" className="btn btn-sec">📋 Open PDF in Drive ↗</a>
+                        </div>
+                      ) : (
+                        <div className="txt-sm" style={{margin:"16px 0",color:"#aa3322"}}>Resume files not saved yet.</div>
+                      )}
+                      <div style={{background:"var(--gold-p)",border:"1px solid var(--border)",borderRadius:"var(--rs)",padding:"14px 16px",fontSize:13,color:"var(--ink-l)",marginBottom:16}}>
+                        ✓ The Word doc and PDF are saved to your <strong>Job Search App / Resumes</strong> folder in Google Drive.<br/>Open them above to confirm the formatting looks correct before emails are sent.
+                      </div>
+                      <div className="btn-row">
+                        <button className="btn btn-gh" onClick={() => setStep(3)}>← Back to Edit</button>
+                        <button className="btn btn-pri" onClick={step5}>Looks Good — Draft Emails →</button>
+                      </div>
+                    </>
+                  )}
+
+                  {step === 5 && (
                     <>
                       <div className="dl mb12">Review each email. Edit if needed. 24-hour intervals between sends.</div>
                       {drafts.map((d, i) => (
@@ -587,7 +607,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                           <div className="em-ft">📎 Tailored Resume — {company}.pdf · attached</div>
                         </div>
                       ))}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(3)}>← Back</button><button className="btn btn-pri" onClick={launch}>🚀 Launch Sequence</button></div>
+                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(4)}>← Back</button><button className="btn btn-pri" onClick={launch}>🚀 Launch Sequence</button></div>
                     </>
                   )}
                 </div>
