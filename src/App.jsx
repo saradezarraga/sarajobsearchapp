@@ -329,7 +329,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       });
       const saveData = await saveRes.json();
       if (saveData.error) throw new Error(saveData.error);
-      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName });
+      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, pdfBase64: saveData.pdfBase64 || null });
       setLoading(false);
       setStep(4);
     } catch (e) {
@@ -397,7 +397,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
 
   const launch = async () => {
-    setLoading(true); setLoadMsg("Looking up email addresses and saving data…");
+    setLoading(true); setLoadMsg("Looking up email addresses…");
     try {
       const domain = company.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
       const withEmails = await Promise.all(ordered.map(async c => {
@@ -406,12 +406,36 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         const email = await hunterLookup(parts[0] || "", parts[parts.length - 1] || "", domain, hunterKey);
         return { ...c, email: email || altFormats(parts[0] || "", parts[parts.length - 1] || "", domain)[0], altFailed: !email };
       }));
+
+      // Send first email immediately with PDF attached
+      setLoadMsg("Sending first email…");
+      const firstContact = withEmails[0];
+      const firstDraft = drafts.find(d => d.contact.name === firstContact.name) || drafts[0];
+      if (firstContact && firstDraft && firstContact.email) {
+        const sendRes = await fetch("/.netlify/functions/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: firstContact.email,
+            subject: firstDraft.subject || `Introduction — ${role} at ${company}`,
+            body: firstDraft.edited,
+            pdfBase64: driveLinks.pdfBase64 || null,
+            pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`
+          })
+        });
+        const sendData = await sendRes.json();
+        if (sendData.error) throw new Error("Gmail send failed: " + sendData.error);
+      }
+
+      setLoadMsg("Saving application…");
       const newJob = {
         id: Date.now().toString(), company, role,
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         status: "active",
         contacts: withEmails.map((c, i) => ({ ...c, sequencePos: i + 1, status: i === 0 ? "sent" : "pending", sentAt: i === 0 ? new Date().toISOString() : null })),
-        coreSkills: skills, tailoredResume: tailored, emailDrafts: drafts.map(d => d.edited), createdAt: new Date().toISOString(),
+        coreSkills: skills, tailoredResume: tailored, emailDrafts: drafts.map(d => d.edited),
+        driveDocxUrl: driveLinks.docxUrl, drivePdfUrl: driveLinks.pdfUrl,
+        createdAt: new Date().toISOString(),
       };
       const newJobs = [newJob, ...jobs];
       setAndSaveJobs(newJobs);
@@ -646,7 +670,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                             <div className="em-to"><strong>To:</strong> {d.contact.name}{d.contact.title ? ` (${d.contact.title}` : ""}{d.contact.dept ? `, ${d.contact.dept}` : ""}{d.contact.title ? ")" : ""} · {company}</div>
                             <button className="btn btn-gh" style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => { const u = [...drafts]; u[i] = { ...u[i], editing: !u[i].editing }; setDrafts(u); }}>{d.editing ? "Done" : "✏ Edit"}</button>
                           </div>
-                          {d.editing ? <textarea style={{ width: "100%", minHeight: 140, padding: "12px 16px", border: "none", borderBottom: "1px solid var(--border)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, outline: "none", resize: "vertical", lineHeight: 1.6 }} value={d.edited} onChange={e => { const u = [...drafts]; u[i] = { ...u[i], edited: e.target.value }; setDrafts(u); }} /> : <div className="em-b">{d.edited}</div>}
+                          {d.editing ? <><textarea style={{ width: "100%", minHeight: 140, padding: "12px 16px", border: "none", borderBottom: "1px solid var(--border)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, outline: "none", resize: "vertical", lineHeight: 1.6 }} value={d.edited} onChange={e => { const u = [...drafts]; u[i] = { ...u[i], edited: e.target.value }; setDrafts(u); }} /><div style={{display:"flex",justifyContent:"flex-end",padding:"6px 12px",gap:8}}><button className="btn btn-sec" style={{fontSize:12}} onClick={saveAsTemplate}>💾 Save as Template</button><button className="btn btn-gh" style={{fontSize:12}} onClick={() => { const u = [...drafts]; u[i] = { ...u[i], editing: false }; setDrafts(u); }}>Done ✓</button></div></> : <div className="em-b">{d.edited}</div>}
                           <div className="em-ft">📎 Tailored Resume — {company}.pdf · attached</div>
                         </div>
                       ))}
