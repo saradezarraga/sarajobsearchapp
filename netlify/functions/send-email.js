@@ -1,51 +1,30 @@
 const { getStore } = require('@netlify/blobs');
-const https = require('https');
-
-function postForm(url, data) {
-  return new Promise((resolve, reject) => {
-    const body = new URLSearchParams(data).toString();
-    const urlObj = new URL(url);
-    const req = https.request({
-      hostname: urlObj.hostname,
-      path: urlObj.pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    }, res => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve(raw); } });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
 
 async function getAccessToken() {
   const store = getStore('gmail-auth');
   const refreshToken = await store.get('refresh_token');
   if (!refreshToken) throw new Error('Gmail not connected. Please connect Gmail in Settings first.');
 
-  const tokens = await postForm('https://oauth2.googleapis.com/token', {
-    refresh_token: refreshToken,
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
-    client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    grant_type: 'refresh_token'
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
+      client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+      grant_type: 'refresh_token'
+    }).toString()
   });
 
+  const tokens = await res.json();
   if (tokens.error) throw new Error('Failed to refresh Gmail token: ' + (tokens.error_description || tokens.error));
   return tokens.access_token;
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
   const boundary = 'boundary_' + Date.now();
-  const from = 'Sara de Zárraga <saradezarraga@gmail.com>';
-
   const lines = [
-    `From: ${from}`,
+    `From: Sara de Zárraga <saradezarraga@gmail.com>`,
     `To: ${to}`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
@@ -90,7 +69,6 @@ exports.handler = async (event) => {
     if (!to || !subject || !body) throw new Error('Missing to, subject, or body');
 
     const accessToken = await getAccessToken();
-
     const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
     const encoded = Buffer.from(rawMime)
       .toString('base64')
