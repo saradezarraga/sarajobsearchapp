@@ -9,10 +9,18 @@ const STORAGE_KEY = "jsa_v1";
 
 function renderMarkdown(text) {
   if (!text) return "";
+  // Handle clean HEADLINE/ACCOMPLISHMENTS format from Claude
+  if (text.includes('HEADLINE:') || text.includes('ACCOMPLISHMENTS:')) {
+    return text
+      .replace(/^HEADLINE:\s*/gm, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Headline Summary</h3>')
+      .replace(/^ACCOMPLISHMENTS:\s*/gm, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Relevant Accomplishments</h3>')
+      .replace(/^(\d+)\. ([^:]+): (.+)$/gm, '<div style="margin-bottom:10px"><strong>$1. <em>$2</em>:</strong> $3</div>')
+      .replace(/\n\n/g, '<br/><br/>')
+      .replace(/\n/g, '<br/>');
+  }
   return text
     .replace(/^# (.+)$/gm, "<h1 style='font-family:Georgia,serif;font-size:18px;font-weight:700;margin:0 0 4px'>$1</h1>")
     .replace(/^## (.+)$/gm, "<h2 style='font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 6px;color:#5a5a7a'>$1</h2>")
-    .replace(/^### (.+)$/gm, "<h3 style='font-size:13px;font-weight:700;margin:10px 0 4px'>$1</h3>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/^(\d+)\. \*(.+?)\*: (.+)$/gm, "<div style='margin-bottom:10px'><strong>$1. <em>$2</em>:</strong> $3</div>")
@@ -268,8 +276,39 @@ export default function App() {
     try {
       const docs = await loadDrive();
       const res = await callClaude(
-        `You are Sara de Zárraga's resume tailoring assistant.\n\nTAILORING RULES:\n{{TAILORING_RULES}}\n\nSOURCE MATERIAL:\n{{SOURCE_MATERIAL}}\n\nWrite in Sara's voice: confident, direct, first-person. No buzzwords. Use clean markdown: # for name, ## for section headers, numbered list for accomplishments with italic titles using *title*: format.`,
-        `Tailor Sara's resume for this role.\n\nMASTER RESUME:\n{{MASTER_RESUME}}\n\nJOB DESCRIPTION:\n${jdText || "Role: " + role + " at " + company}\n\nCOMPANY: ${company}\nROLE: ${role}\n\nRewrite ONLY Headline Summary and Relevant Accomplishments (3-5 max). Output the full resume.`,
+        `You are Sara de Zárraga's resume tailoring assistant. You update ONLY two sections of her resume for each job application.
+
+TAILORING RULES:
+{{TAILORING_RULES}}
+
+SOURCE MATERIAL (accomplishments bank):
+{{SOURCE_MATERIAL}}
+
+CRITICAL INSTRUCTIONS:
+- Return ONLY the two sections below. Nothing else. No name, no contact info, no employment history, no education, no other sections.
+- Write in Sara's voice: confident, direct, first-person. No buzzwords. No markdown symbols.
+- Format exactly as shown.`,
+        `Update Sara's resume for this role.
+
+JOB DESCRIPTION:
+${jdText || "Role: " + role + " at " + company}
+
+COMPANY: ${company}
+ROLE: ${role}
+
+Return ONLY this exact format — nothing before, nothing after:
+
+HEADLINE:
+[3-4 sentence headline paragraph. No bullet points. Plain text only.]
+
+ACCOMPLISHMENTS:
+1. [Title]: [Body text]
+2. [Title]: [Body text]
+3. [Title]: [Body text]
+4. [Title]: [Body text]
+5. [Title]: [Body text]
+
+Select 3-5 accomplishments based on role fit. Each title should mirror the job description language. Each body is 4-7 sentences. First person throughout.`,
         4000,
         true
       );
