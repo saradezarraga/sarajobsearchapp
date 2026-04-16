@@ -539,6 +539,21 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                                   <div className="ci"><div className="c-n">{c.name}</div><div className="c-s">{c.title}{c.dept ? ` · ${c.dept}` : ""}</div>{c.email && <div className="c-s" style={{ fontFamily: "monospace", fontSize: 10 }}>{c.email}</div>}{c.altFailed && <div className="c-s" style={{ color: "#aa6600" }}>⚠ Alt format used</div>}</div>
                                   <div className={`dot d-${c.status === "pending" ? "p" : c.status === "sent" ? "s" : c.status === "replied" ? "r" : c.status === "bounced" ? "b" : "nr"}`} />
                                   <span style={{ fontSize: 10, color: "var(--ink-l)", textTransform: "capitalize" }}>{c.status}</span>
+                                  {c.status === "pending" && c.email && (
+                                    <button className="btn btn-gh" style={{fontSize:11,padding:"2px 8px",marginLeft:8}} onClick={async e => {
+                                      e.stopPropagation();
+                                      if (!window.confirm(`Send email to ${c.name} now?`)) return;
+                                      const draft = j.emailDrafts?.[i] || j.emailDrafts?.[0] || "";
+                                      const res = await fetch("/.netlify/functions/send-email", {
+                                        method: "POST", headers: {"Content-Type":"application/json"},
+                                        body: JSON.stringify({ to: c.email, subject: `Introduction - ${j.role} at ${j.company}`, body: draft, docxId: null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                                      });
+                                      const data = await res.json();
+                                      if (data.error) { alert("Send failed: " + data.error); return; }
+                                      const updated = jobs.map(jj => jj.id === j.id ? { ...jj, contacts: jj.contacts.map((cc, ci) => ci === i ? { ...cc, status: "sent", sentAt: new Date().toISOString() } : cc) } : jj);
+                                      setAndSaveJobs(updated);
+                                    }}>Send Now</button>
+                                  )}
                                 </div>
                               ))}
                             </div>
