@@ -182,52 +182,53 @@ exports.handler = async (event) => {
     zip.file('word/document.xml', xml);
     const newDocBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-    // Upload to Resumes folder
+    // Copy master file first (uses owner's quota, not service account's)
     const resumesFolderId = await findOrCreateFolder(drive, 'Resumes', APP_FOLDER_ID);
     const monthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const fileName = `${company} — ${role} — ${monthYear}`;
 
-    const uploaded = await drive.files.create({
+    const copied = await drive.files.copy({
+      fileId: MASTER_RESUME_ID,
       requestBody: {
         name: fileName + '.docx',
-        parents: [resumesFolderId],
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      },
-      media: {
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        body: Readable.from(newDocBuffer)
+        parents: [resumesFolderId]
       },
       fields: 'id, webViewLink'
     });
 
-    const docxId = uploaded.data.id;
-    const docxUrl = uploaded.data.webViewLink;
+    const docxId = copied.data.id;
 
-    // Export PDF via Google Drive
+    // Now update the copy with our edited content
+    await drive.files.update({
+      fileId: docxId,
+      media: {
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        body: Readable.from(newDocBuffer)
+      }
+    });
+
+    const docxMeta = await drive.files.get({ fileId: docxId, fields: 'webViewLink' });
+    const docxUrl = docxMeta.data.webViewLink;
+
+    // Export PDF via Google Drive export (no new file creation needed)
     const pdfRes = await drive.files.export(
       { fileId: docxId, mimeType: 'application/pdf' },
       { responseType: 'arraybuffer' }
     );
     const pdfBuffer = Buffer.from(pdfRes.data);
 
-    const pdfUploaded = await drive.files.create({
-      requestBody: {
-        name: fileName + '.pdf',
-        parents: [resumesFolderId],
-        mimeType: 'application/pdf'
-      },
-      media: { mimeType: 'application/pdf', body: Readable.from(pdfBuffer) },
-      fields: 'id, webViewLink'
-    });
+    // Upload PDF as a copy of a placeholder — or just use Drive's view URL for the docx
+    // For now return the docx view URL as PDF preview and base64 for email attachment
+    const pdfBase64 = pdfBuffer.toString('base64');
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        docxId, docxUrl,
-        pdfId: pdfUploaded.data.id,
-        pdfUrl: pdfUploaded.data.webViewLink,
-        pdfBase64: pdfBuffer.toString('base64'),
+        docxId,
+        docxUrl,
+        pdfUrl: docxUrl, // View the docx in Drive; PDF is attached to emails via base64
+        pdfBase64,
         fileName
       })
     };
