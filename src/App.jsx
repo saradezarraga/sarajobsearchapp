@@ -387,7 +387,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           600
         );
         const subjectLine = `Introduction — ${role} at ${company}`;
-        return { contact: c, draft: d, edited: d, editing: false, subject: subjectLine };
+        return { contact: c, draft: d, edited: d, editing: true, subject: subjectLine };
       }));
       setDrafts(results); setLoading(false); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }
@@ -713,12 +713,74 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, onSave }) {
   const [k, setK] = useState(hunterKey);
   const [contacts, setContacts] = useState(liContacts);
   const [saved, setSaved] = useState(false);
+  const [template, setTemplate] = useState('');
+  const [templateLoading, setTemplateLoading] = useState(true);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
   const ref = useRef();
+
+  useEffect(() => {
+    fetch('/.netlify/functions/load-email-templates')
+      .then(r => r.json())
+      .then(d => { setTemplate(d.content || ''); setTemplateLoading(false); })
+      .catch(() => setTemplateLoading(false));
+  }, []);
+
+  const saveTemplate = async () => {
+    setTemplateSaving(true);
+    try {
+      const res = await fetch('/.netlify/functions/save-email-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawTemplate: template })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 2000);
+    } catch (e) { alert('Failed to save template: ' + e.message); }
+    setTemplateSaving(false);
+  };
+
   const handleCSV = e => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = ev => setContacts(parseCSV(ev.target.result)); r.readAsText(f); };
   return (
     <>
       <div className="flex-bw mb28"><div><div className="pg-t">Settings</div><div className="pg-s">API keys and data sources.</div></div></div>
       <div className="sg">
+
+        <div className="ss">
+          <div className="ss-t">Email Template</div>
+          <div style={{fontSize:13,color:"var(--ink-l)",lineHeight:1.7,marginBottom:12}}>
+            This is the base language Claude uses to draft referral emails. Edit it here to match your voice. Each individual email can also be edited before it sends.
+          </div>
+          {templateLoading ? (
+            <div style={{fontSize:13,color:"var(--ink-l)"}}>Loading template…</div>
+          ) : (
+            <>
+              <textarea
+                value={template}
+                onChange={e => setTemplate(e.target.value)}
+                placeholder={"Write your email template here. You can use placeholders like [Name], [Company], [Role], [Relationship].
+
+Example:
+Hi [Name],
+
+I hope this finds you well! I came across your profile and noticed you work at [Company]...
+
+Best,
+Sara"}
+                style={{width:'100%',minHeight:220,fontSize:13,lineHeight:1.7,padding:'12px',borderRadius:8,border:'1px solid #d0d0e0',fontFamily:'inherit',resize:'vertical',boxSizing:'border-box'}}
+              />
+              <div style={{marginTop:10,display:'flex',gap:10,alignItems:'center'}}>
+                <button className="btn btn-pri" onClick={saveTemplate} disabled={templateSaving}>
+                  {templateSaved ? '✓ Saved' : templateSaving ? 'Saving…' : 'Save Template'}
+                </button>
+                <span style={{fontSize:12,color:"var(--ink-l)"}}>Claude adapts this for each contact's name, company, role, and relationship.</span>
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="ss"><div className="ss-t">Hunter.io API Key</div><div className="fg"><label className="fl">API Key</label><input className="fi" type="password" value={k} onChange={e => setK(e.target.value)} /><div className="fh">25 lookups/month on free plan.</div></div></div>
         <div className="ss"><div className="ss-t">LinkedIn Contacts CSV</div>
           <div className={`upz ${contacts.length > 0 ? "has" : ""}`} onClick={() => ref.current?.click()}>

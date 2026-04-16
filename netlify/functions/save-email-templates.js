@@ -12,10 +12,7 @@ async function getGoogleAuth() {
       throw new Error('Failed to parse service account: ' + e.message);
     }
   }
-  return new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/drive']
-  });
+  return new google.auth.GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/drive'] });
 }
 
 exports.handler = async (event) => {
@@ -30,26 +27,32 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { drafts } = JSON.parse(event.body);
-    if (!drafts || !drafts.length) throw new Error('No drafts provided');
+    const body = JSON.parse(event.body);
+
+    // Two modes: rawTemplate (from Settings editor) or drafts (from email step)
+    let docContent = '';
+    if (body.rawTemplate !== undefined) {
+      // Direct template edit from Settings
+      docContent = body.rawTemplate;
+    } else if (body.drafts && body.drafts.length) {
+      // Save approved email drafts as new template baseline
+      const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      docContent = `EMAIL TEMPLATES — Last updated: ${now}\n\n`;
+      docContent += `Claude uses this as the base language for drafting referral emails. It adapts the contact name, company, role, and relationship for each email.\n\n`;
+      docContent += `${'─'.repeat(60)}\n\n`;
+      for (const draft of body.drafts) {
+        docContent += `TEMPLATE TYPE: ${(draft.label || 'draft').toUpperCase()}\n`;
+        if (draft.subject) docContent += `Subject: ${draft.subject}\n\n`;
+        docContent += `${draft.edited}\n\n`;
+        docContent += `${'─'.repeat(60)}\n\n`;
+      }
+    } else {
+      throw new Error('No template content provided');
+    }
 
     const auth = await getGoogleAuth();
     const drive = google.drive({ version: 'v3', auth });
 
-    // Build plain text content for the template doc
-    const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    let docContent = `EMAIL TEMPLATES\nLast updated: ${now}\n\n`;
-    docContent += `These are Sara's approved email templates. Future emails should use this language as a base and adapt the contact name, company, and role.\n\n`;
-    docContent += `${'─'.repeat(60)}\n\n`;
-
-    for (const draft of drafts) {
-      docContent += `TEMPLATE: ${draft.label.toUpperCase()}\n`;
-      docContent += `Subject: ${draft.subject}\n\n`;
-      docContent += `${draft.edited}\n\n`;
-      docContent += `${'─'.repeat(60)}\n\n`;
-    }
-
-    // Check if template file already exists
     const existing = await drive.files.list({
       q: `name='${TEMPLATE_FILE_NAME}' and '${APP_FOLDER_ID}' in parents and trashed=false`,
       fields: 'files(id)'
@@ -63,19 +66,14 @@ exports.handler = async (event) => {
       });
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, fileId }) };
     } else {
-      // Create as plain text file (not Google Doc) to avoid conversion issues
       const created = await drive.files.create({
         requestBody: { name: TEMPLATE_FILE_NAME, parents: [APP_FOLDER_ID], mimeType: 'text/plain' },
         media: { mimeType: 'text/plain', body: Buffer.from(docContent, 'utf8') },
-        fields: 'id, webViewLink'
+        fields: 'id'
       });
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, fileId: created.data.id }) };
     }
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message })
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
   }
 };
