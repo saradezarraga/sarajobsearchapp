@@ -1,7 +1,7 @@
 exports.handler = async () => {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const redirectUri = 'https://sara-job-search-app.netlify.app/auth/callback';
-  const scope = 'https://www.googleapis.com/auth/gmail.send';
+  const scope = 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive';
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}` +
