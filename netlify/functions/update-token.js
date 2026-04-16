@@ -7,6 +7,6 @@ exports.handler = async (event) => {
     headers: { 'Authorization': `Bearer ${process.env.NETLIFY_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ values: [{ value: token, context: 'all' }] })
   });
-  const data = await res.json();
-  return { statusCode: 200, body: JSON.stringify(data) };
+  const text = await res.text();
+  return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: `Status: ${res.status}\n${text}` };
 };
