@@ -38,7 +38,7 @@ async function callClaude(sys, msg, maxTokens = 4000, injectDocs = false) {
   if (injectDocs) body.injectDocs = true;
   const res = await fetch("/.netlify/functions/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  if (data.error) throw new Error(data.error.message || data.error.error || JSON.stringify(data.error));
   return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
 }
 
@@ -322,11 +322,16 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   const [gmailConnected, setGmailConnected] = useState(null); // null=loading, true, false
 
   useEffect(() => {
-    // Check Gmail auth status
-    fetch("/.netlify/functions/gmail-auth-status")
-      .then(r => r.json())
-      .then(d => setGmailConnected(d.connected))
-      .catch(() => setGmailConnected(false));
+    // Check Gmail auth status — check both env var (via function) and localStorage token
+    const localToken = localStorage.getItem("gmail_refresh_token");
+    if (localToken) {
+      setGmailConnected(true);
+    } else {
+      fetch("/.netlify/functions/gmail-auth-status")
+        .then(r => r.json())
+        .then(d => setGmailConnected(d.connected))
+        .catch(() => setGmailConnected(false));
+    }
     // Handle OAuth callback
     const params = new URLSearchParams(window.location.search);
     const authResult = params.get("gmail_auth");
@@ -381,7 +386,8 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           `Email to ${c.name}${c.title ? " (" + c.title + ")" : ""} at ${company}. Role: ${role}. Relationship: ${rel}. Under 150 words. Ask for referral. Mention shared HBS/Wellesley if alumni. Be human.`,
           600
         );
-        return { contact: c, draft: d, edited: d, editing: false };
+        const subjectLine = `Introduction — ${role} at ${company}`;
+        return { contact: c, draft: d, edited: d, editing: false, subject: subjectLine };
       }));
       setDrafts(results); setLoading(false); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }

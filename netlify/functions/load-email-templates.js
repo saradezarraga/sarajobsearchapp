@@ -30,23 +30,36 @@ exports.handler = async (event) => {
 
     const res = await drive.files.list({
       q: `name='${TEMPLATE_FILE_NAME}' and '${APP_FOLDER_ID}' in parents and trashed=false`,
-      fields: 'files(id)'
+      fields: 'files(id, mimeType)'
     });
 
     if (!res.data.files.length) {
       return { statusCode: 200, headers, body: JSON.stringify({ content: null }) };
     }
 
-    const fileId = res.data.files[0].id;
-    const exported = await drive.files.export(
-      { fileId, mimeType: 'text/plain' },
-      { responseType: 'text' }
-    );
+    const file = res.data.files[0];
+    let content = null;
+
+    if (file.mimeType === 'application/vnd.google-apps.document') {
+      // Google Doc — use export
+      const exported = await drive.files.export(
+        { fileId: file.id, mimeType: 'text/plain' },
+        { responseType: 'text' }
+      );
+      content = exported.data;
+    } else {
+      // Plain text file — use media download
+      const downloaded = await drive.files.get(
+        { fileId: file.id, alt: 'media' },
+        { responseType: 'text' }
+      );
+      content = downloaded.data;
+    }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ content: exported.data })
+      body: JSON.stringify({ content })
     };
   } catch (err) {
     return {

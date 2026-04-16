@@ -55,43 +55,21 @@ exports.handler = async (event) => {
       fields: 'files(id)'
     });
 
-    const { Readable } = require('stream');
-    const mimeType = 'text/plain';
-
     if (existing.data.files.length > 0) {
-      // Update existing file
       const fileId = existing.data.files[0].id;
       await drive.files.update({
         fileId,
-        media: {
-          mimeType,
-          body: Readable.from(Buffer.from(docContent, 'utf8'))
-        }
+        media: { mimeType: 'text/plain', body: Buffer.from(docContent, 'utf8') }
       });
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ success: true, fileId })
-      };
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, fileId }) };
     } else {
-      // Create new file
+      // Create as plain text file (not Google Doc) to avoid conversion issues
       const created = await drive.files.create({
-        requestBody: {
-          name: TEMPLATE_FILE_NAME,
-          parents: [APP_FOLDER_ID],
-          mimeType: 'application/vnd.google-apps.document'
-        },
-        media: {
-          mimeType,
-          body: Readable.from(Buffer.from(docContent, 'utf8'))
-        },
+        requestBody: { name: TEMPLATE_FILE_NAME, parents: [APP_FOLDER_ID], mimeType: 'text/plain' },
+        media: { mimeType: 'text/plain', body: Buffer.from(docContent, 'utf8') },
         fields: 'id, webViewLink'
       });
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ success: true, fileId: created.data.id, url: created.data.webViewLink })
-      };
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, fileId: created.data.id }) };
     }
   } catch (err) {
     return {
