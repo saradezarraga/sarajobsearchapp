@@ -262,19 +262,8 @@ export default function App() {
       setSkills(sk);
       setFdMatches(liContacts.filter(c => c.company?.toLowerCase().includes(company.toLowerCase())));
       setSelFd({}); setManContacts([]);
-      setLoading(false); setStep(1);
-    } catch (e) { setLoading(false); alert(e.message); }
-  };
-
-  const step2 = () => {
-    const fd = fdMatches.filter((_, i) => selFd[i]).map(c => ({ name: c.fullName, title: c.title, dept: c.company, email: c.email || null, type: "first_degree", status: "pending" }));
-    setOrdered([...fd, ...manContacts.map(c => ({ ...c, status: "pending" }))]);
-    setStep(2);
-  };
-
-  const step3 = async () => {
-    setLoading(true); setLoadMsg("Loading documents and tailoring your resume…");
-    try {
+      // Now tailor resume
+      setLoadMsg("Loading documents and tailoring your resume…");
       const docs = await loadDrive();
       const res = await callClaude(
         `You are Sara de Zárraga's resume tailoring assistant. You update ONLY two sections of her resume for each job application.
@@ -313,9 +302,18 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         4000,
         true
       );
-      setTailored(res); setEditResume(false); setLoading(false); setStep(3);
+      setTailored(res); setEditResume(false);
+      setLoading(false); setStep(1);
     } catch (e) { setLoading(false); alert(e.message); }
   };
+
+  const step2 = () => {
+    const fd = fdMatches.filter((_, i) => selFd[i]).map(c => ({ name: c.fullName, title: c.title, dept: c.company, email: c.email || null, type: "first_degree", status: "pending" }));
+    setOrdered([...fd, ...manContacts.map(c => ({ ...c, status: "pending" }))]);
+    setStep(4);
+  };
+
+
 
   const [driveLinks, setDriveLinks] = useState({ docxUrl: null, pdfUrl: null, fileName: null });
   const [savedTemplates, setSavedTemplates] = useState(null);
@@ -359,7 +357,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       if (saveData.error) throw new Error(saveData.error);
       setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, docxId: saveData.docxId || null });
       setLoading(false);
-      setStep(4);
+      setStep(2);
     } catch (e) {
       setLoading(false);
       alert("Drive save failed: " + e.message);
@@ -466,7 +464,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   const onDragEnd = () => setDragI(null);
   const addManual = () => { if (!newC.name.trim()) return; setManContacts(p => [...p, { ...newC }]); setNewC({ name: "", title: "", dept: "", linkedinUrl: "", type: "alumni" }); };
 
-  const STEPS = ["Job Details", "Contacts", "Order", "Resume", "Preview", "Emails"];
+  const STEPS = ["Job Details", "Resume", "Preview", "Contacts", "Order", "Emails"];
 
   return (
     <>
@@ -606,10 +604,10 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                       </div>
                       <div className="fg"><label className="fl">Job Posting URL</label><input className="fi" value={jdUrl} onChange={e => setJdUrl(e.target.value)} placeholder="https://…" /><div className="fh">Or paste the job description below</div></div>
                       <div className="fg"><label className="fl">Job Description</label><textarea className="fi fta" value={jdText} onChange={e => setJdText(e.target.value)} placeholder="Paste the full job description here…" /></div>
-                      <div className="btn-row"><button className="btn btn-pri" onClick={step1} disabled={(!jdText.trim() && !jdUrl.trim()) || !company.trim() || !role.trim()}>Analyze & Find Contacts →</button></div>
+                      <div className="btn-row"><button className="btn btn-pri" onClick={step1} disabled={(!jdText.trim() && !jdUrl.trim()) || !company.trim() || !role.trim()}>Analyze & Tailor Resume →</button></div>
                     </>
                   )}
-                  {step === 1 && (
+                  {step === 3 && (
                     <>
                       {skills.length > 0 && <div className="mb20"><div className="dl">Why I'll tailor your resume this way — {role} at {company}</div><div className="sk-grid mt8">{skills.map((s, i) => <div key={i} className="sk"><div className="sk-t">{s.title}</div><div className="sk-d">{s.desc}</div></div>)}</div></div>}
                       <div className="divider" />
@@ -649,12 +647,12 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                         </div>
                       </div>
                       <div className="btn-row">
-                        <button className="btn btn-gh" onClick={() => setStep(0)}>← Back</button>
+                        <button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button>
                         <button className="btn btn-pri" onClick={step2} disabled={Object.values(selFd).filter(Boolean).length === 0 && manContacts.length === 0}>Confirm Contacts →</button>
                       </div>
                     </>
                   )}
-                  {step === 2 && (
+                  {step === 4 && (
                     <>
                       <div className="dl mb12">Drag to reorder. First contact is emailed immediately when you launch.</div>
                       {ordered.map((c, i) => (
@@ -665,20 +663,21 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                           <span className={`tb ${c.type === "first_degree" ? "tb-fd" : c.type === "both" ? "tb-bt" : "tb-al"}`}>{c.type === "first_degree" ? "1st Degree" : c.type === "both" ? "1st + Alum" : "Alum"}</span>
                         </div>
                       ))}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(1)}>← Back</button><button className="btn btn-pri" onClick={step3}>Tailor Resume →</button></div>
+                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(3)}>← Back</button><button className="btn btn-pri" onClick={step5}>Draft Emails →</button></div>
                     </>
                   )}
-                  {step === 3 && (
+                  {step === 1 && (
                     <>
+                      {skills.length > 0 && <div className="mb16"><div className="dl">Why I'll tailor your resume this way — {role} at {company}</div><div className="sk-grid mt8">{skills.map((s, i) => <div key={i} className="sk"><div className="sk-t">{s.title}</div><div className="sk-d">{s.desc}</div></div>)}</div></div>}
                       <div className="flex-bw mb12">
                         <div className="dl">Tailored Resume — {company}</div>
                         <button className="btn btn-gh" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => setEditResume(!editResume)}>{editResume ? "Preview" : "✏ Edit"}</button>
                       </div>
                       {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev" dangerouslySetInnerHTML={{__html: renderMarkdown(tailored)}} />}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(2)}>← Back</button><button className="btn btn-pri" onClick={saveResumeToDrive}>Approve Text & Save Resume →</button></div>
+                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(0)}>← Back</button><button className="btn btn-pri" onClick={saveResumeToDrive}>Approve Text & Save Resume →</button></div>
                     </>
                   )}
-                  {step === 4 && (
+                  {step === 2 && (
                     <>
                       <div className="dl" style={{marginBottom:12}}>Review your tailored resume before sending. Open both files and confirm the formatting looks right.</div>
                       {driveLinks.docxUrl ? (
@@ -692,8 +691,8 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                         ✓ Your tailored resume is saved to your <strong>Job Search App / Resumes</strong> folder in Google Drive.<br/>Open it above to confirm the formatting looks correct. A PDF will be attached to your emails automatically.
                       </div>
                       <div className="btn-row">
-                        <button className="btn btn-gh" onClick={() => setStep(3)}>← Back to Edit</button>
-                        <button className="btn btn-pri" onClick={step5}>Looks Good — Draft Emails →</button>
+                        <button className="btn btn-gh" onClick={() => setStep(1)}>← Back to Edit</button>
+                        <button className="btn btn-pri" onClick={() => setStep(3)}>Looks Good — Add Contacts →</button>
                       </div>
                     </>
                   )}
@@ -781,15 +780,7 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, onSave }) {
               <textarea
                 value={template}
                 onChange={e => setTemplate(e.target.value)}
-                placeholder={"Write your email template here. You can use placeholders like [Name], [Company], [Role], [Relationship].
-
-Example:
-Hi [Name],
-
-I hope this finds you well! I came across your profile and noticed you work at [Company]...
-
-Best,
-Sara"}
+                placeholder={`Write your email template here. Use placeholders like [Name], [Company], [Role].\n\nExample:\nHi [Name], I noticed you work at [Company] and I'm applying for the [Role] role...`}
                 style={{width:'100%',minHeight:220,fontSize:13,lineHeight:1.7,padding:'12px',borderRadius:8,border:'1px solid #d0d0e0',fontFamily:'inherit',resize:'vertical',boxSizing:'border-box'}}
               />
               <div style={{marginTop:10,display:'flex',gap:10,alignItems:'center'}}>
