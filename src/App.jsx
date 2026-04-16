@@ -529,7 +529,6 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                       </div>
                       {expanded === j.id && (
                         <div className="jd-detail">
-                          {j.coreSkills?.length > 0 && <div className="mb20"><div className="dl mt16">Why this role — {j.role} at {j.company}</div><div className="sk-grid mt8">{j.coreSkills.map((s, i) => <div key={i} className="sk"><div className="sk-t">{s.title}</div><div className="sk-d">{s.desc}</div></div>)}</div></div>}
                           <div className="d-grid">
                             <div>
                               <div className="dl">Outreach Sequence</div>
@@ -538,7 +537,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                                   <div className="cn">{i + 1}</div>
                                   <div className="ci"><div className="c-n">{c.name}</div><div className="c-s">{c.title}{c.dept ? ` · ${c.dept}` : ""}</div>{c.email && <div className="c-s" style={{ fontFamily: "monospace", fontSize: 10 }}>{c.email}</div>}{c.altFailed && <div className="c-s" style={{ color: "#aa6600" }}>⚠ Alt format used</div>}</div>
                                   <div className={`dot d-${c.status === "pending" ? "p" : c.status === "sent" ? "s" : c.status === "replied" ? "r" : c.status === "bounced" ? "b" : "nr"}`} />
-                                  <span style={{ fontSize: 10, color: "var(--ink-l)", textTransform: "capitalize" }}>{c.status}</span>
+                                  <span style={{ fontSize: 10, color: "var(--ink-l)", textTransform: "capitalize" }}>{c.status}{c.status === "sent" && c.sentAt ? ` ${new Date(c.sentAt).toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'2-digit'})}` : ""}</span>
                                   {c.status === "pending" && c.email && (
                                     <button className="btn btn-gh" style={{fontSize:11,padding:"2px 8px",marginLeft:8}} onClick={async e => {
                                       e.stopPropagation();
@@ -559,8 +558,15 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                             </div>
                             <div>
                               <div className="dl">Resume Used</div>
-                              <div style={{ background: "var(--white)", border: "1px solid var(--border)", borderRadius: "var(--rs)", padding: "8px 12px", fontSize: 13, marginBottom: 8 }}>📄 Tailored Resume — {j.company}</div>
-                              {j.tailoredResume && <div className="r-prev" style={{ maxHeight: 180, fontSize: 11 }}>{j.tailoredResume.slice(0, 600)}…</div>}
+                              {j.driveDocxUrl ? (
+                                <a href={j.driveDocxUrl} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
+                                  <div style={{ background: "var(--white)", border: "1px solid var(--border)", borderRadius: "var(--rs)", padding: "8px 12px", fontSize: 13, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+                                    📄 <span style={{fontWeight:500}}>SaradeZarraga-{j.company}-{j.role.replace(/\s+/g,'-')}.docx</span> <span style={{fontSize:11,color:"var(--ink-l)"}}>↗ Open in Drive</span>
+                                  </div>
+                                </a>
+                              ) : (
+                                <div style={{ background: "var(--white)", border: "1px solid var(--border)", borderRadius: "var(--rs)", padding: "8px 12px", fontSize: 13 }}>📄 Tailored Resume — {j.company}</div>
+                              )}
                             </div>
                           </div>
                         </div>
