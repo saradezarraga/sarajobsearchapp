@@ -10,10 +10,11 @@ const STORAGE_KEY = "jsa_v1";
 function renderMarkdown(text) {
   if (!text) return "";
   // Handle clean HEADLINE/ACCOMPLISHMENTS format from Claude
-  if (text.includes('HEADLINE:') || text.includes('ACCOMPLISHMENTS:')) {
+  if (text.includes('HEADLINE:') || text.includes('ACCOMPLISHMENTS:') || text.includes('Headline Summary') || text.includes('Relevant Accomplishments')) {
     return text
-      .replace(/^HEADLINE:\s*/gm, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Headline Summary</h3>')
-      .replace(/^ACCOMPLISHMENTS:\s*/gm, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Relevant Accomplishments</h3>')
+      .replace(/^(?:HEADLINE:|##\s*Headline Summary|Headline Summary:?)\s*/gim, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Headline Summary</h3>')
+      .replace(/^(?:ACCOMPLISHMENTS:|##\s*Relevant Accomplishments|Relevant Accomplishments:?)\s*/gim, '<h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a5a7a;margin:14px 0 6px">Relevant Accomplishments</h3>')
+      .replace(/^(\d+)\. \*([^*]+)\*: (.+)$/gm, '<div style="margin-bottom:10px"><strong>$1. <em>$2</em>:</strong> $3</div>')
       .replace(/^(\d+)\. ([^:]+): (.+)$/gm, '<div style="margin-bottom:10px"><strong>$1. <em>$2</em>:</strong> $3</div>')
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
@@ -390,23 +391,10 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
   const saveAsTemplate = async () => {
     try {
-      const body = JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 100,
-        messages: [{ role: "user", content: "ok" }]
-      });
-      // Use a Netlify function to write to Drive
-      const res = await fetch("/.netlify/functions/save-templates", {
+      const res = await fetch("/.netlify/functions/save-email-templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          docId: EMAIL_TEMPLATES_DOC_ID,
-          templates: {
-            firstDegree: drafts[0]?.edited || drafts[0]?.body || "",
-            alumni: drafts[1]?.edited || drafts[1]?.body || "",
-            both: drafts[2]?.edited || drafts[2]?.body || ""
-          }
-        })
+        body: JSON.stringify({ drafts: drafts.map(d => ({ label: d.contact?.type || "draft", subject: d.subject || "", edited: d.edited || d.draft || "" })) })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);

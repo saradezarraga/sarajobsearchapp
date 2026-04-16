@@ -173,7 +173,7 @@ exports.handler = async (event) => {
     while ((m = paraRegex2.exec(xml)) !== null) {
       allParas.push({ xml: m[0], index: m.index, end: m.index + m[0].length });
     }
-    const newRelAccIdx = allParas.findIndex(p => p.xml.replace(/<[^>]+>/g, '').includes('RELEVANT ACCOMPLISHMENTS'));
+    const newRelAccIdx = allParas.findIndex(p => { const t = allParas[0] && p.xml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').toUpperCase(); return t && t.includes('RELEVANT') && t.includes('ACCOMPLISHMENTS'); });
     let newHeadlineParaIdx = -1;
     for (let i = newRelAccIdx - 1; i >= 0; i--) {
       const text = allParas[i].xml.replace(/<[^>]+>/g, '').trim();
