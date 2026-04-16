@@ -353,7 +353,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       const saveRes = await fetch("/.netlify/functions/generate-resume", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText: tailored, company, role })
+        body: JSON.stringify({ resumeText: tailored, company, role, refreshToken: localStorage.getItem("gmail_refresh_token") || null })
       });
       const saveData = await saveRes.json();
       if (saveData.error) throw new Error(saveData.error);

@@ -5,7 +5,18 @@ const { Readable } = require('stream');
 const APP_FOLDER_ID = '1koBBe1Th7qmD2AAF3eljwNor8gPYcl5f';
 const MASTER_RESUME_ID = '1Wt72BdV8NPrbE_lYHVGQGQwq3fzN6Ixh';
 
-async function getGoogleAuth() {
+async function getGoogleAuth(refreshToken) {
+  // Use Sara's OAuth token if available (avoids service account quota issues)
+  // Falls back to service account for read-only operations
+  if (refreshToken) {
+    const oauth2 = new google.auth.OAuth2(
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    );
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    return oauth2;
+  }
+  // Fallback: service account (read-only operations only)
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT not set');
   let creds;
@@ -90,14 +101,16 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { resumeText, company, role } = JSON.parse(event.body);
+    const { resumeText, company, role, refreshToken } = JSON.parse(event.body);
     if (!resumeText) throw new Error('No resume text provided');
 
     const { headline, accomplishments } = parseTailoredSections(resumeText);
     if (!headline) throw new Error('Could not parse headline. Text starts with: ' + resumeText.substring(0, 120));
     if (!accomplishments.length) throw new Error('Could not parse accomplishments. Text: ' + resumeText.substring(0, 200));
 
-    const auth = await getGoogleAuth();
+    // Use Sara's OAuth token for Drive writes (service account has no storage quota)
+    const token = refreshToken || process.env.GMAIL_REFRESH_TOKEN || null;
+    const auth = await getGoogleAuth(token);
     const drive = google.drive({ version: 'v3', auth });
 
     // Download master Word doc
