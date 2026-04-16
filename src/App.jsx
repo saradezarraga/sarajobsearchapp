@@ -330,9 +330,11 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
     const params = new URLSearchParams(window.location.search);
     const authResult = params.get("gmail_auth");
     if (authResult === "success") {
+      const rt = params.get("refresh_token");
+      if (rt) localStorage.setItem("gmail_refresh_token", rt);
       setGmailConnected(true);
       window.history.replaceState({}, "", "/");
-      alert("✓ Gmail connected successfully! The app can now send emails on your behalf.");
+      alert("✓ Gmail connected! The app can now send emails on your behalf.");
     } else if (authResult === "error") {
       window.history.replaceState({}, "", "/");
       alert("Gmail connection failed: " + (params.get("reason") || "Unknown error"));
@@ -440,7 +442,8 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             subject: firstDraft.subject || `Introduction — ${role} at ${company}`,
             body: firstDraft.edited,
             pdfBase64: driveLinks.pdfBase64 || null,
-            pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`
+            pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`,
+            refreshToken: localStorage.getItem("gmail_refresh_token") || null
           })
         });
         const sendData = await sendRes.json();
