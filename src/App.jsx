@@ -187,7 +187,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink)}
 `;
 
 export default function App() {
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(window.location.pathname === '/coach' ? 'coach' : "dashboard");
   const [jobs, setJobs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [expanded, setExpanded] = useState(null);
@@ -727,10 +727,89 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             </>
           )}
 
+          {view === "coach" && <CoachView jobs={jobs} />}
           {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} gmailConnected={gmailConnected} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
         </main>
       </div>
     </>
+  );
+}
+
+function CoachView({ jobs: propJobs }) {
+  const [jobs, setJobs] = React.useState(propJobs || []);
+  const [updatedAt, setUpdatedAt] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch("/.netlify/functions/load-coach-snapshot")
+      .then(r => r.json())
+      .then(d => { setJobs(d.jobs || []); setUpdatedAt(d.updatedAt); setLoading(false); })
+      .catch(() => { setJobs(propJobs || []); setLoading(false); });
+  }, []);
+
+  const stats = {
+    total: jobs.length,
+    active: jobs.filter(j => j.status === "active").length,
+    sent: jobs.reduce((acc, j) => acc + (j.contacts || []).filter(c => c.status === "sent" || c.status === "replied").length, 0),
+    replied: jobs.filter(j => (j.contacts || []).some(c => c.status === "replied")).length,
+  };
+
+  return (
+    <div style={{maxWidth:800,margin:"0 auto",padding:"32px 24px",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{marginBottom:32}}>
+        <div style={{fontSize:22,fontWeight:700,color:"#1a1a2e",fontFamily:"'Playfair Display',serif"}}>Sara de Zarraga — Job Search</div>
+        <div style={{fontSize:13,color:"#5a5a7a",marginTop:4}}>Coach View — Read Only{updatedAt ? ` · Updated ${new Date(updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}` : ""}</div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:32}}>
+        {[["Applications",stats.total],["Active",stats.active],["Emails Sent",stats.sent],["Responses",stats.replied]].map(([label,val]) => (
+          <div key={label} style={{background:"#fff",border:"1px solid #e2ddd5",borderRadius:10,padding:"16px 20px"}}>
+            <div style={{fontSize:11,color:"#5a5a7a",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>{label}</div>
+            <div style={{fontSize:28,fontWeight:700,color:"#1a1a2e"}}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? <div style={{color:"#5a5a7a",fontSize:13}}>Loading…</div> : jobs.length === 0 ? (
+        <div style={{color:"#5a5a7a",fontSize:13,textAlign:"center",padding:40}}>No applications yet.</div>
+      ) : (
+        <div style={{border:"1px solid #e2ddd5",borderRadius:10,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1.5fr",padding:"10px 16px",background:"#f7f4f0",fontSize:11,fontWeight:600,color:"#5a5a7a",textTransform:"uppercase",letterSpacing:".06em"}}>
+            <span>Company / Role</span><span>Date</span><span>Status</span><span>Outreach</span>
+          </div>
+          {jobs.map((j, idx) => (
+            <div key={j.id} style={{borderTop:"1px solid #e2ddd5"}}>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1.5fr",padding:"14px 16px",alignItems:"start"}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:14,color:"#1a1a2e"}}>{j.company}</div>
+                  <div style={{fontSize:12,color:"#5a5a7a",marginTop:2}}>{j.role}</div>
+                  {j.driveDocxUrl && (
+                    <a href={j.driveDocxUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#b8963d",textDecoration:"none",marginTop:4,display:"inline-block"}}>📄 View Resume ↗</a>
+                  )}
+                </div>
+                <div style={{fontSize:13,color:"#5a5a7a",paddingTop:2}}>{j.date}</div>
+                <div style={{paddingTop:2}}>
+                  <span style={{fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20,background: j.status==="active"?"#e8f5ee":j.status==="paused"?"#fff3e0":"#f0f0f0",color:j.status==="active"?"#2a7a4b":j.status==="paused"?"#b86a00":"#5a5a7a"}}>
+                    {j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status || "Draft"}
+                  </span>
+                </div>
+                <div style={{fontSize:12,color:"#5a5a7a"}}>
+                  {(j.contacts || []).map((c, i) => (
+                    <div key={i} style={{marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",background:c.status==="replied"?"#2a7a4b":c.status==="sent"?"#b8963d":c.status==="bounced"?"#cc4444":"#ccc",display:"inline-block",flexShrink:0}} />
+                      <span>{c.name}</span>
+                      <span style={{color:"#9a9ab0",fontSize:11}}>
+                        {c.status==="sent"&&c.sentAt ? `sent ${new Date(c.sentAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}` : c.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -822,7 +901,16 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, onSave }) {
             <a href="/.netlify/functions/gmail-auth-start" className="btn btn-pri" style={{display:"inline-block",textDecoration:"none"}}>Connect Gmail →</a>
           )}
         </div>
-        <div className="ss"><div className="ss-t">Career Coach Access</div><div style={{ fontSize: 13, color: "var(--ink-l)", lineHeight: 1.7, marginBottom: 12 }}>Share a read-only view of your dashboard with your coach.</div><button className="btn btn-sec">📋 Copy Coach View Link</button></div>
+        <div className="ss"><div className="ss-t">Career Coach Access</div><div style={{ fontSize: 13, color: "var(--ink-l)", lineHeight: 1.7, marginBottom: 12 }}>Share a read-only view of your dashboard with your coach.</div><button className="btn btn-sec" onClick={async () => {
+          try {
+            await fetch("/.netlify/functions/save-coach-snapshot", {
+              method: "POST", headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({ jobs })
+            });
+            await navigator.clipboard.writeText(window.location.origin + "/coach");
+            alert("✓ Coach view link copied! Share this URL with your coach:\n" + window.location.origin + "/coach");
+          } catch (e) { alert("Failed: " + e.message); }
+        }}>📋 Copy Coach View Link</button></div>
       </div>
       <div className="btn-row mt16"><button className="btn btn-pri" onClick={() => { onSave(k, contacts); setSaved(true); setTimeout(() => setSaved(false), 2000); }}>{saved ? "✓ Saved" : "Save Settings"}</button></div>
     </>

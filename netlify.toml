@@ -13,3 +13,8 @@
   from = "/auth/callback"
   to = "/.netlify/functions/gmail-auth-callback"
   status = 200
+
+[[redirects]]
+  from = "/coach"
+  to = "/index.html"
+  status = 200
