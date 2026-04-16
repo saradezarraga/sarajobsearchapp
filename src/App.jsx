@@ -56,15 +56,20 @@ function altFormats(fn, ln, domain) {
 }
 
 function parseCSV(text) {
-  const lines = text.split("\n").filter(Boolean);
-  if (lines.length < 2) return [];
-  const h = lines[0].toLowerCase().replace(/"/g, "").split(",").map(c => c.trim());
+  const lines = text.split("\n").filter(l => l.trim());
+  // LinkedIn exports have 3 header rows before the actual data — skip them
+  const headerIdx = lines.findIndex(l => /first.name/i.test(l));
+  if (headerIdx === -1) return [];
+  const h = lines[headerIdx].toLowerCase().replace(/"/g, "").split(",").map(c => c.trim());
   const idx = (terms) => h.findIndex(c => terms.some(t => c.includes(t)));
   const fi = idx(["first"]), li = idx(["last"]), ci = idx(["company"]), ti = idx(["position", "title"]), ei = idx(["email"]);
-  return lines.slice(1).map(line => {
+  return lines.slice(headerIdx + 1).map(line => {
     const p = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(x => x.replace(/"/g, "").trim());
     const g = i => i >= 0 ? p[i] || "" : "";
-    return { firstName: g(fi), lastName: g(li), company: g(ci), title: g(ti), email: g(ei), fullName: `${g(fi)} ${g(li)}`.trim() };
+    // Strip emoji and special chars from names
+    const cleanName = s => s.replace(/[^\w\s\-'.]/gu, "").trim();
+    const fn = cleanName(g(fi)), ln = cleanName(g(li));
+    return { firstName: fn, lastName: ln, company: g(ci), title: g(ti), email: g(ei), fullName: `${fn} ${ln}`.trim() };
   }).filter(c => c.fullName.trim().length > 1);
 }
 
