@@ -30,15 +30,18 @@ async function findOrCreateFolder(drive, name, parentId) {
   return folder.data.id;
 }
 
+// Flexible parser — handles HEADLINE:, Headline Summary, ## Headline Summary, etc.
 function parseTailoredSections(text) {
   const result = { headline: '', accomplishments: [] };
 
-  // Handle multiple possible headline formats
-  const headlineMatch = text.match(/(?:HEADLINE:|Headline Summary:?|##\s*Headline Summary)\s*\n([\s\S]*?)(?=\n(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant|\d+\.)|$)/i);
+  const headlineMatch = text.match(
+    /(?:HEADLINE:|Headline Summary:?|##\s*Headline Summary)\s*\n([\s\S]*?)(?=\n(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant|\d+\.)|$)/i
+  );
   if (headlineMatch) result.headline = headlineMatch[1].trim();
 
-  // Handle multiple possible accomplishments formats
-  const accMatch = text.match(/(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant Accomplishments)\s*\n([\s\S]*?)$/i);
+  const accMatch = text.match(
+    /(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant Accomplishments)\s*\n([\s\S]*?)$/i
+  );
   if (accMatch) {
     const items = accMatch[1].trim().split(/\n(?=\d+\.)/);
     for (const item of items) {
@@ -53,19 +56,26 @@ function parseTailoredSections(text) {
 }
 
 function escXml(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
-// Build a single Word paragraph XML, copying pPr/rPr from a sample paragraph
-function buildParagraph(text, sampleXml, italic = false) {
-  const pPr = sampleXml.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] || '';
-  let rPr = sampleXml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] || '';
-  if (italic && rPr) {
-    rPr = rPr.replace('</w:rPr>', '<w:i/><w:iCs/></w:rPr>');
-  } else if (italic) {
-    rPr = '<w:rPr><w:i/><w:iCs/></w:rPr>';
+function stripXml(x) {
+  return x.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function parseParas(xml) {
+  const paras = [];
+  const re = /<w:p[ >][\s\S]*?<\/w:p>/g;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    paras.push({ xml: m[0], index: m.index, end: m.index + m[0].length });
   }
-  return `<w:p>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escXml(text)}</w:t></w:r></w:p>`;
+  return paras;
 }
 
 exports.handler = async (event) => {
@@ -84,13 +94,13 @@ exports.handler = async (event) => {
     if (!resumeText) throw new Error('No resume text provided');
 
     const { headline, accomplishments } = parseTailoredSections(resumeText);
-    if (!headline) throw new Error('Could not parse HEADLINE from resume text. Raw text starts with: ' + resumeText.substring(0, 100));
-    if (!accomplishments.length) throw new Error('Could not parse ACCOMPLISHMENTS from resume text');
+    if (!headline) throw new Error('Could not parse headline. Text starts with: ' + resumeText.substring(0, 120));
+    if (!accomplishments.length) throw new Error('Could not parse accomplishments. Text: ' + resumeText.substring(0, 200));
 
     const auth = await getGoogleAuth();
     const drive = google.drive({ version: 'v3', auth });
 
-    // Download master Word doc as binary
+    // Download master Word doc
     const docRes = await drive.files.get(
       { fileId: MASTER_RESUME_ID, alt: 'media' },
       { responseType: 'arraybuffer' }
@@ -98,146 +108,136 @@ exports.handler = async (event) => {
     const docBuffer = Buffer.from(docRes.data);
     if (!docBuffer.length) throw new Error('Master resume download returned empty buffer');
 
-    // Unzip the docx
     const zip = await JSZip.loadAsync(docBuffer);
     let xml = await zip.file('word/document.xml').async('string');
 
-    // ── Find key section markers ─────────────────────────────────────
-    // Find all paragraphs as array with index info
-    const paraRegex = /<w:p[ >][\s\S]*?<\/w:p>/g;
-    let allParas = [];
-    let m;
-    while ((m = paraRegex.exec(xml)) !== null) {
-      allParas.push({ xml: m[0], index: m.index, end: m.index + m[0].length });
-    }
+    // ── Find section markers ─────────────────────────────────────────
+    let allParas = parseParas(xml);
 
-    // Strip XML tags for text comparison (Word splits text across runs)
-    const stripXml = x => x.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-
-    const finalRelAccIdx = allParas.findIndex(p => {
+    const relAccIdx = allParas.findIndex(p => {
       const t = stripXml(p.xml).toUpperCase();
       return t.includes('RELEVANT') && t.includes('ACCOMPLISHMENTS');
     });
-    if (finalRelAccIdx === -1) {
-      const sample = allParas.slice(0, 25).map(p => stripXml(p.xml).substring(0, 60)).join(' || ');
-      throw new Error('Could not find RELEVANT ACCOMPLISHMENTS. Para samples: ' + sample);
+    if (relAccIdx === -1) {
+      const sample = allParas.slice(0, 25).map(p => stripXml(p.xml).substring(0, 50)).join(' | ');
+      throw new Error('Could not find RELEVANT ACCOMPLISHMENTS. Paragraphs: ' + sample);
     }
 
     const empHistIdx = allParas.findIndex(p => {
       const t = stripXml(p.xml).toUpperCase();
       return t.includes('EMPLOYMENT') && t.includes('HISTORY');
     });
-    if (empHistIdx === -1) throw new Error('Could not find EMPLOYMENT HISTORY section in document XML');
+    if (empHistIdx === -1) throw new Error('Could not find EMPLOYMENT HISTORY');
 
-    // Headline: last paragraph before RELEVANT ACCOMPLISHMENTS with substantial text (>50 chars)
+    // Sanity check: accomplishments must be between relAcc and empHist
+    if (empHistIdx <= relAccIdx) throw new Error(
+      `Section order wrong: EMPLOYMENT HISTORY (${empHistIdx}) before RELEVANT ACCOMPLISHMENTS (${relAccIdx})`
+    );
+
+    // Find headline paragraph: last paragraph before RELEVANT ACCOMPLISHMENTS with >50 chars
     let headlineParaIdx = -1;
-    for (let i = finalRelAccIdx - 1; i >= 0; i--) {
-      const text = allParas[i].xml.replace(/<[^>]+>/g, '').trim();
-      if (text.length > 50) { headlineParaIdx = i; break; }
+    for (let i = relAccIdx - 1; i >= 0; i--) {
+      if (stripXml(allParas[i].xml).length > 50) { headlineParaIdx = i; break; }
     }
     if (headlineParaIdx === -1) throw new Error('Could not find headline paragraph');
 
-    // ── Replace headline ─────────────────────────────────────────────
+    // ── Build replacement XML ────────────────────────────────────────
+    // Headline paragraph — copy formatting from original
     const headlineSample = allParas[headlineParaIdx];
-    const newHeadlinePara = buildParagraph(headline, headlineSample.xml, false);
+    const pPrH = headlineSample.xml.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] || '';
+    const rPrH = headlineSample.xml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] || '';
+    const newHeadlinePara = `<w:p>${pPrH}<w:r>${rPrH}<w:t xml:space="preserve">${escXml(headline)}</w:t></w:r></w:p>`;
 
-    // ── Build new accomplishments XML ────────────────────────────────
-    // Use first accomplishment paragraph as formatting sample
-    const accSample = allParas[finalRelAccIdx + 1] || allParas[finalRelAccIdx];
+    // Accomplishment paragraphs — copy formatting from first accomplishment paragraph
+    const accSample = allParas[relAccIdx + 1] || allParas[relAccIdx];
+    const pPrA = accSample.xml.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] || '';
+    const rPrA = accSample.xml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] || '';
+    const rPrAItalic = rPrA
+      ? rPrA.replace('</w:rPr>', '<w:i/><w:iCs/></w:rPr>')
+      : '<w:rPr><w:i/><w:iCs/></w:rPr>';
+
     let newAccXml = '';
     for (const acc of accomplishments) {
-      // Title in italic + body in normal — same paragraph, two runs
-      const pPr = accSample.xml.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] || '';
-      let rPr = accSample.xml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] || '';
-      const rPrItalic = rPr
-        ? rPr.replace('</w:rPr>', '<w:i/><w:iCs/></w:rPr>')
-        : '<w:rPr><w:i/><w:iCs/></w:rPr>';
-
-      newAccXml += `<w:p>${pPr}` +
-        `<w:r>${rPrItalic}<w:t xml:space="preserve">${escXml(acc.title)}: </w:t></w:r>` +
-        `<w:r>${rPr}<w:t xml:space="preserve">${escXml(acc.body)}</w:t></w:r>` +
+      newAccXml += `<w:p>${pPrA}` +
+        `<w:r>${rPrAItalic}<w:t xml:space="preserve">${escXml(acc.title)}: </w:t></w:r>` +
+        `<w:r>${rPrA}<w:t xml:space="preserve">${escXml(acc.body)}</w:t></w:r>` +
         `</w:p>`;
     }
 
-    // ── Apply changes to XML string ──────────────────────────────────
-    // Work backwards so indices stay valid: accomplishments first, then headline
-
-    // Replace accomplishments: everything between relAcc para end and empHist para start
-    const accBlockStart = allParas[finalRelAccIdx].end;
+    // ── Apply replacements — accomplishments first (furthest back), then headline ──
+    const accBlockStart = allParas[relAccIdx].end;
     const accBlockEnd = allParas[empHistIdx].index;
     xml = xml.substring(0, accBlockStart) + newAccXml + xml.substring(accBlockEnd);
 
-    // Re-parse to get fresh indices after acc replacement
-    allParas = [];
-    const paraRegex2 = /<w:p[ >][\s\S]*?<\/w:p>/g;
-    while ((m = paraRegex2.exec(xml)) !== null) {
-      allParas.push({ xml: m[0], index: m.index, end: m.index + m[0].length });
-    }
-    const newRelAccIdx = allParas.findIndex(p => { const t = allParas[0] && p.xml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').toUpperCase(); return t && t.includes('RELEVANT') && t.includes('ACCOMPLISHMENTS'); });
-    let newHeadlineParaIdx = -1;
-    for (let i = newRelAccIdx - 1; i >= 0; i--) {
-      const text = allParas[i].xml.replace(/<[^>]+>/g, '').trim();
-      if (text.length > 50) { newHeadlineParaIdx = i; break; }
-    }
-
-    if (newHeadlineParaIdx >= 0) {
-      const hp = allParas[newHeadlineParaIdx];
-      xml = xml.substring(0, hp.index) + newHeadlinePara + xml.substring(hp.end);
+    // Re-parse with fresh indices to replace headline
+    allParas = parseParas(xml);
+    const newRelAccIdx = allParas.findIndex(p => {
+      const t = stripXml(p.xml).toUpperCase();
+      return t.includes('RELEVANT') && t.includes('ACCOMPLISHMENTS');
+    });
+    if (newRelAccIdx >= 0) {
+      let newHeadlineIdx = -1;
+      for (let i = newRelAccIdx - 1; i >= 0; i--) {
+        if (stripXml(allParas[i].xml).length > 50) { newHeadlineIdx = i; break; }
+      }
+      if (newHeadlineIdx >= 0) {
+        const hp = allParas[newHeadlineIdx];
+        xml = xml.substring(0, hp.index) + newHeadlinePara + xml.substring(hp.end);
+      }
     }
 
     // Repack zip
     zip.file('word/document.xml', xml);
     const newDocBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-    // Copy master file first (uses owner's quota, not service account's)
+    // ── Save to Drive ────────────────────────────────────────────────
     const resumesFolderId = await findOrCreateFolder(drive, 'Resumes', APP_FOLDER_ID);
     const monthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const fileName = `${company} — ${role} — ${monthYear}`;
 
+    // Copy master (uses owner's quota, not service account's)
     const copied = await drive.files.copy({
       fileId: MASTER_RESUME_ID,
-      requestBody: {
-        name: fileName + '.docx',
-        parents: [resumesFolderId]
-      },
+      requestBody: { name: fileName + '.docx', parents: [resumesFolderId] },
       fields: 'id, webViewLink'
     });
-
     const docxId = copied.data.id;
 
-    // Now update the copy with our edited content
+    // Update copy with edited content — pass Buffer directly, not a stream
     await drive.files.update({
       fileId: docxId,
       media: {
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        body: Readable.from(newDocBuffer)
+        body: newDocBuffer  // Buffer directly — more reliable than Readable.from()
       }
     });
 
     const docxMeta = await drive.files.get({ fileId: docxId, fields: 'webViewLink' });
     const docxUrl = docxMeta.data.webViewLink;
 
-    // Export PDF via Google Drive export (no new file creation needed)
-    const pdfRes = await drive.files.export(
-      { fileId: docxId, mimeType: 'application/pdf' },
-      { responseType: 'arraybuffer' }
-    );
-    const pdfBuffer = Buffer.from(pdfRes.data);
-
-    // Upload PDF as a copy of a placeholder — or just use Drive's view URL for the docx
-    // For now return the docx view URL as PDF preview and base64 for email attachment
-    const pdfBase64 = pdfBuffer.toString('base64');
+    // Export PDF — add small retry since Drive may not have processed the update yet
+    let pdfBase64 = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 2000)); // wait 2s between retries
+        const pdfRes = await drive.files.export(
+          { fileId: docxId, mimeType: 'application/pdf' },
+          { responseType: 'arraybuffer' }
+        );
+        const pdfBuf = Buffer.from(pdfRes.data);
+        if (pdfBuf.length > 1000) { // sanity check — real PDFs are much larger
+          pdfBase64 = pdfBuf.toString('base64');
+          break;
+        }
+      } catch (e) {
+        if (attempt === 2) console.error('PDF export failed after 3 attempts:', e.message);
+      }
+    }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        docxId,
-        docxUrl,
-        pdfUrl: docxUrl, // View the docx in Drive; PDF is attached to emails via base64
-        pdfBase64,
-        fileName
-      })
+      body: JSON.stringify({ docxId, docxUrl, pdfUrl: docxUrl, pdfBase64, fileName })
     };
   } catch (err) {
     return {

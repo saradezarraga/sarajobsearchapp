@@ -352,7 +352,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       });
       const saveData = await saveRes.json();
       if (saveData.error) throw new Error(saveData.error);
-      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, pdfBase64: saveData.pdfBase64 || null });
+      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, docxId: saveData.docxId || null });
       setLoading(false);
       setStep(4);
     } catch (e) {
@@ -429,7 +429,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             to: firstContact.email,
             subject: firstDraft.subject || `Introduction — ${role} at ${company}`,
             body: firstDraft.edited,
-            pdfBase64: driveLinks.pdfBase64 || null,
+            docxId: driveLinks.docxId || null,
             pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`,
             refreshToken: localStorage.getItem("gmail_refresh_token") || null
           })
