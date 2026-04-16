@@ -205,8 +205,7 @@ exports.handler = async (event) => {
 
     // ── Save to Drive ────────────────────────────────────────────────
     const resumesFolderId = await findOrCreateFolder(drive, 'Resumes', APP_FOLDER_ID);
-    const monthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const fileName = `${company} — ${role} — ${monthYear}`;
+    const fileName = `SaradeZarraga-${company.replace(/[^a-zA-Z0-9]/g, '')}-${role.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-')}`;
 
     // Copy master (uses owner's quota, not service account's)
     const copied = await drive.files.copy({
