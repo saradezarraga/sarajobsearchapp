@@ -662,14 +662,13 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                       <div className="dl" style={{marginBottom:12}}>Review your tailored resume before sending. Open both files and confirm the formatting looks right.</div>
                       {driveLinks.docxUrl ? (
                         <div style={{display:"flex",gap:12,flexWrap:"wrap",margin:"16px 0"}}>
-                          <a href={driveLinks.docxUrl} target="_blank" rel="noreferrer" className="btn btn-sec">📄 Open Word Doc in Drive ↗</a>
-                          <a href={driveLinks.pdfUrl} target="_blank" rel="noreferrer" className="btn btn-sec">📋 Open PDF in Drive ↗</a>
+                          <a href={driveLinks.docxUrl} target="_blank" rel="noreferrer" className="btn btn-sec">📄 Open Resume in Drive ↗</a>
                         </div>
                       ) : (
                         <div className="txt-sm" style={{margin:"16px 0",color:"#aa3322"}}>Resume files not saved yet.</div>
                       )}
                       <div style={{background:"var(--gold-p)",border:"1px solid var(--border)",borderRadius:"var(--rs)",padding:"14px 16px",fontSize:13,color:"var(--ink-l)",marginBottom:16}}>
-                        ✓ The Word doc and PDF are saved to your <strong>Job Search App / Resumes</strong> folder in Google Drive.<br/>Open them above to confirm the formatting looks correct before emails are sent.
+                        ✓ Your tailored resume is saved to your <strong>Job Search App / Resumes</strong> folder in Google Drive.<br/>Open it above to confirm the formatting looks correct. A PDF will be attached to your emails automatically.
                       </div>
                       <div className="btn-row">
                         <button className="btn btn-gh" onClick={() => setStep(3)}>← Back to Edit</button>
