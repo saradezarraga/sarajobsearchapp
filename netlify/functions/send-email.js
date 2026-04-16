@@ -34,9 +34,9 @@ async function getPdfFromDrive(docxId) {
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
   const boundary = 'boundary_' + Date.now();
   const lines = [
-    `From: Sara de Zárraga <saradezarraga@gmail.com>`,
+    `From: Sara de Zarraga <saradezarraga@gmail.com>`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     ``,

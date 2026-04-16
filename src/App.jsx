@@ -386,7 +386,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           `Email to ${c.name}${c.title ? " (" + c.title + ")" : ""} at ${company}. Role: ${role}. Relationship: ${rel}. Under 150 words. Ask for referral. Mention shared HBS/Wellesley if alumni. Be human.`,
           600
         );
-        const subjectLine = `Introduction — ${role} at ${company}`;
+        const subjectLine = `Introduction - ${role} at ${company}`;
         return { contact: c, draft: d, edited: d, editing: true, subject: subjectLine };
       }));
       setDrafts(results); setLoading(false); setStep(5);
@@ -433,7 +433,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: firstContact.email,
-            subject: firstDraft.subject || `Introduction — ${role} at ${company}`,
+            subject: firstDraft.subject || `Introduction - ${role} at ${company}`,
             body: firstDraft.edited,
             docxId: driveLinks.docxId || null,
             pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`,
