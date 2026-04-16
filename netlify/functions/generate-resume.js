@@ -32,14 +32,21 @@ async function findOrCreateFolder(drive, name, parentId) {
 
 function parseTailoredSections(text) {
   const result = { headline: '', accomplishments: [] };
-  const headlineMatch = text.match(/HEADLINE:\s*\n([\s\S]*?)(?=\nACCOMPLISHMENTS:|$)/i);
+
+  // Handle multiple possible headline formats
+  const headlineMatch = text.match(/(?:HEADLINE:|Headline Summary:?|##\s*Headline Summary)\s*\n([\s\S]*?)(?=\n(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant|\d+\.)|$)/i);
   if (headlineMatch) result.headline = headlineMatch[1].trim();
-  const accMatch = text.match(/ACCOMPLISHMENTS:\s*\n([\s\S]*?)$/i);
+
+  // Handle multiple possible accomplishments formats
+  const accMatch = text.match(/(?:ACCOMPLISHMENTS:|Relevant Accomplishments:?|##\s*Relevant Accomplishments)\s*\n([\s\S]*?)$/i);
   if (accMatch) {
     const items = accMatch[1].trim().split(/\n(?=\d+\.)/);
     for (const item of items) {
-      const m = item.match(/^\d+\.\s*([^:]+):\s*([\s\S]*)/);
-      if (m) result.accomplishments.push({ title: m[1].trim(), body: m[2].trim().replace(/\n/g, ' ') });
+      const m = item.match(/^\d+\.\s*(?:\*([^*]+)\*|([^:]+)):\s*([\s\S]*)/);
+      if (m) result.accomplishments.push({
+        title: (m[1] || m[2] || '').trim(),
+        body: m[3].trim().replace(/\n/g, ' ')
+      });
     }
   }
   return result;
