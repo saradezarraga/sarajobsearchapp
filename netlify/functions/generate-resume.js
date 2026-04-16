@@ -104,17 +104,27 @@ exports.handler = async (event) => {
       allParas.push({ xml: m[0], index: m.index, end: m.index + m[0].length });
     }
 
-    // Find RELEVANT ACCOMPLISHMENTS paragraph index
-    const relAccIdx = allParas.findIndex(p => p.xml.replace(/<[^>]+>/g, '').includes('RELEVANT ACCOMPLISHMENTS'));
-    if (relAccIdx === -1) throw new Error('Could not find RELEVANT ACCOMPLISHMENTS section in document XML');
+    // Strip XML tags for text comparison (Word splits text across runs)
+    const stripXml = x => x.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
-    // Find EMPLOYMENT HISTORY paragraph index
-    const empHistIdx = allParas.findIndex(p => p.xml.replace(/<[^>]+>/g, '').includes('EMPLOYMENT HISTORY'));
+    const finalRelAccIdx = allParas.findIndex(p => {
+      const t = stripXml(p.xml).toUpperCase();
+      return t.includes('RELEVANT') && t.includes('ACCOMPLISHMENTS');
+    });
+    if (finalRelAccIdx === -1) {
+      const sample = allParas.slice(0, 25).map(p => stripXml(p.xml).substring(0, 60)).join(' || ');
+      throw new Error('Could not find RELEVANT ACCOMPLISHMENTS. Para samples: ' + sample);
+    }
+
+    const empHistIdx = allParas.findIndex(p => {
+      const t = stripXml(p.xml).toUpperCase();
+      return t.includes('EMPLOYMENT') && t.includes('HISTORY');
+    });
     if (empHistIdx === -1) throw new Error('Could not find EMPLOYMENT HISTORY section in document XML');
 
     // Headline: last paragraph before RELEVANT ACCOMPLISHMENTS with substantial text (>50 chars)
     let headlineParaIdx = -1;
-    for (let i = relAccIdx - 1; i >= 0; i--) {
+    for (let i = finalRelAccIdx - 1; i >= 0; i--) {
       const text = allParas[i].xml.replace(/<[^>]+>/g, '').trim();
       if (text.length > 50) { headlineParaIdx = i; break; }
     }
@@ -126,7 +136,7 @@ exports.handler = async (event) => {
 
     // ── Build new accomplishments XML ────────────────────────────────
     // Use first accomplishment paragraph as formatting sample
-    const accSample = allParas[relAccIdx + 1] || allParas[relAccIdx];
+    const accSample = allParas[finalRelAccIdx + 1] || allParas[finalRelAccIdx];
     let newAccXml = '';
     for (const acc of accomplishments) {
       // Title in italic + body in normal — same paragraph, two runs
@@ -146,7 +156,7 @@ exports.handler = async (event) => {
     // Work backwards so indices stay valid: accomplishments first, then headline
 
     // Replace accomplishments: everything between relAcc para end and empHist para start
-    const accBlockStart = allParas[relAccIdx].end;
+    const accBlockStart = allParas[finalRelAccIdx].end;
     const accBlockEnd = allParas[empHistIdx].index;
     xml = xml.substring(0, accBlockStart) + newAccXml + xml.substring(accBlockEnd);
 
