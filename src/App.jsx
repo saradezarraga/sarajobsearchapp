@@ -187,7 +187,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink)}
 `;
 
 export default function App() {
-  const [view, setView] = useState(window.location.pathname === '/coach' ? 'coach' : "dashboard");
+  const [view, setView] = useState(window.location.pathname === '/coach' ? 'coach' : 'dashboard');
   const [jobs, setJobs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [expanded, setExpanded] = useState(null);
@@ -470,6 +470,8 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   const addManual = () => { if (!newC.name.trim()) return; setManContacts(p => [...p, { ...newC }]); setNewC({ name: "", title: "", dept: "", linkedinUrl: "", type: "alumni" }); };
 
   const STEPS = ["Job Details", "Resume", "Preview", "Contacts", "Order", "Emails"];
+
+  if (view === 'coach') return <><style>{CSS}</style><CoachView jobs={jobs} /></>;
 
   return (
     <>
