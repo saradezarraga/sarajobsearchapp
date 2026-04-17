@@ -741,6 +741,7 @@ function CoachView({ jobs: propJobs }) {
   const [jobs, setJobs] = useState(propJobs || []);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
     fetch("/.netlify/functions/load-coach-snapshot")
@@ -752,68 +753,80 @@ function CoachView({ jobs: propJobs }) {
   const stats = {
     total: jobs.length,
     active: jobs.filter(j => j.status === "active").length,
-    sent: jobs.reduce((acc, j) => acc + (j.contacts || []).filter(c => c.status === "sent" || c.status === "replied").length, 0),
-    replied: jobs.filter(j => (j.contacts || []).some(c => c.status === "replied")).length,
+    responses: jobs.filter(j => (j.contacts || []).some(c => c.status === "replied")).length,
+    attention: jobs.filter(j => j.status === "paused" || (j.contacts || []).some(c => c.status === "bounced")).length,
   };
 
   return (
-    <div style={{maxWidth:800,margin:"0 auto",padding:"32px 24px",fontFamily:"'DM Sans',sans-serif"}}>
-      <div style={{marginBottom:32}}>
-        <div style={{fontSize:22,fontWeight:700,color:"#1a1a2e",fontFamily:"'Playfair Display',serif"}}>Sara de Zarraga — Job Search</div>
-        <div style={{fontSize:13,color:"#5a5a7a",marginTop:4}}>Coach View — Read Only{updatedAt ? ` · Updated ${new Date(updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}` : ""}</div>
-      </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:32}}>
-        {[["Applications",stats.total],["Active",stats.active],["Emails Sent",stats.sent],["Responses",stats.replied]].map(([label,val]) => (
-          <div key={label} style={{background:"#fff",border:"1px solid #e2ddd5",borderRadius:10,padding:"16px 20px"}}>
-            <div style={{fontSize:11,color:"#5a5a7a",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>{label}</div>
-            <div style={{fontSize:28,fontWeight:700,color:"#1a1a2e"}}>{val}</div>
+    <>
+      <style>{CSS}</style>
+      <div className="app">
+        <header className="hdr">
+          <div className="hdr-l">
+            <div className="logo">SZ</div>
+            <div><div className="site-n">Job Search</div><div className="site-s">Sara de Zarraga — Coach View</div></div>
           </div>
-        ))}
-      </div>
-
-      {loading ? <div style={{color:"#5a5a7a",fontSize:13}}>Loading…</div> : jobs.length === 0 ? (
-        <div style={{color:"#5a5a7a",fontSize:13,textAlign:"center",padding:40}}>No applications yet.</div>
-      ) : (
-        <div style={{border:"1px solid #e2ddd5",borderRadius:10,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1.5fr",padding:"10px 16px",background:"#f7f4f0",fontSize:11,fontWeight:600,color:"#5a5a7a",textTransform:"uppercase",letterSpacing:".06em"}}>
-            <span>Company / Role</span><span>Date</span><span>Status</span><span>Outreach</span>
+        </header>
+        <main className="main">
+          <div className="pg-t" style={{marginBottom:4}}>Applications</div>
+          <div className="pg-s" style={{marginBottom:4}}>Read-only view{updatedAt ? ` · Updated ${new Date(updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}` : ""}</div>
+          <div className="stats">
+            {[["Total Applied","total"],["Active Sequences","active"],["Responses","responses"],["Need Attention","attention"]].map(([label,key]) => (
+              <div key={key} className="stat-card"><div className="stat-l">{label}</div><div className="stat-v">{stats[key]}</div></div>
+            ))}
           </div>
-          {jobs.map((j, idx) => (
-            <div key={j.id} style={{borderTop:"1px solid #e2ddd5"}}>
-              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1.5fr",padding:"14px 16px",alignItems:"start"}}>
-                <div>
-                  <div style={{fontWeight:600,fontSize:14,color:"#1a1a2e"}}>{j.company}</div>
-                  <div style={{fontSize:12,color:"#5a5a7a",marginTop:2}}>{j.role}</div>
-                  {j.driveDocxUrl && (
-                    <a href={j.driveDocxUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#b8963d",textDecoration:"none",marginTop:4,display:"inline-block"}}>📄 View Resume ↗</a>
+          {loading ? <div className="txt-sm" style={{padding:20}}>Loading…</div> : jobs.length === 0 ? (
+            <div style={{textAlign:"center",padding:60,color:"var(--ink-l)"}}>No applications yet.</div>
+          ) : (
+            <div className="tbl">
+              <div className="tbl-h"><span>Company / Role</span><span>Date</span><span>Status</span><span>Contacts</span><span>Sequence</span><span /></div>
+              {jobs.map(j => (
+                <div key={j.id} className="tbl-r" onClick={() => setExpanded(expanded === j.id ? null : j.id)} style={{cursor:"pointer"}}>
+                  <div className="j-main">
+                    <div className="j-cr"><div className="j-co">{j.company}</div><div className="j-ro">{j.role}</div></div>
+                    <div className="j-cc">{j.date}</div>
+                    <div><span className={`badge b-${j.status === "active" ? "active" : j.status || "draft"}`}>{j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status === "complete" ? "✓ Complete" : "Draft"}</span></div>
+                    <div className="j-cc">{(j.contacts || []).length} contact{(j.contacts || []).length !== 1 ? "s" : ""}</div>
+                    <div className="j-cc">{(j.contacts || []).filter(c => ["sent","replied"].includes(c.status)).length} / {(j.contacts || []).length} sent</div>
+                    <button className="exp-btn">{expanded === j.id ? "▲" : "▼"}</button>
+                  </div>
+                  {expanded === j.id && (
+                    <div className="jd-detail">
+                      <div className="d-grid">
+                        <div>
+                          <div className="dl">Outreach Sequence</div>
+                          {(j.contacts || []).map((c, i) => (
+                            <div key={i} className="cdr">
+                              <div className="cn">{i + 1}</div>
+                              <div className="ci"><div className="c-n">{c.name}</div><div className="c-s">{c.title}</div></div>
+                              <div className={`dot d-${c.status === "pending" ? "p" : c.status === "sent" ? "s" : c.status === "replied" ? "r" : c.status === "bounced" ? "b" : "nr"}`} />
+                              <span style={{fontSize:10,color:"var(--ink-l)",textTransform:"capitalize"}}>{c.status}{c.status === "sent" && c.sentAt ? ` ${new Date(c.sentAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}` : ""}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="dl">Resume Used</div>
+                          {j.driveDocxUrl ? (
+                            <a href={j.driveDocxUrl} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
+                              <div style={{background:"var(--white)",border:"1px solid var(--border)",borderRadius:"var(--rs)",padding:"8px 12px",fontSize:13,display:"flex",alignItems:"center",gap:8}}>
+                                📄 <span style={{fontWeight:500}}>View Resume ↗</span>
+                              </div>
+                            </a>
+                          ) : <div style={{fontSize:13,color:"var(--ink-l)"}}>No resume linked</div>}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div style={{fontSize:13,color:"#5a5a7a",paddingTop:2}}>{j.date}</div>
-                <div style={{paddingTop:2}}>
-                  <span style={{fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20,background: j.status==="active"?"#e8f5ee":j.status==="paused"?"#fff3e0":"#f0f0f0",color:j.status==="active"?"#2a7a4b":j.status==="paused"?"#b86a00":"#5a5a7a"}}>
-                    {j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status || "Draft"}
-                  </span>
-                </div>
-                <div style={{fontSize:12,color:"#5a5a7a"}}>
-                  {(j.contacts || []).map((c, i) => (
-                    <div key={i} style={{marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{width:8,height:8,borderRadius:"50%",background:c.status==="replied"?"#2a7a4b":c.status==="sent"?"#b8963d":c.status==="bounced"?"#cc4444":"#ccc",display:"inline-block",flexShrink:0}} />
-                      <span>{c.name}</span>
-                      <span style={{color:"#9a9ab0",fontSize:11}}>
-                        {c.status==="sent"&&c.sentAt ? `sent ${new Date(c.sentAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}` : c.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+          )}
+        </main>
+      </div>
+    </>
   );
 }
+
 
 function SettingsView({ hunterKey, liContacts, gmailConnected, jobs, onSave }) {
   const [k, setK] = useState(hunterKey);
@@ -907,7 +920,7 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, jobs, onSave }) {
           try {
             await fetch("/.netlify/functions/save-coach-snapshot", {
               method: "POST", headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({ jobs })
+              body: JSON.stringify({ jobs, refreshToken: localStorage.getItem("gmail_refresh_token") })
             });
             await navigator.clipboard.writeText(window.location.origin + "/coach");
             alert("✓ Coach view link copied! Share this URL with your coach:\n" + window.location.origin + "/coach");

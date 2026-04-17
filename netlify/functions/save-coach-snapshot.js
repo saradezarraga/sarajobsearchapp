@@ -3,7 +3,15 @@ const { google } = require('googleapis');
 const APP_FOLDER_ID = '1koBBe1Th7qmD2AAF3eljwNor8gPYcl5f';
 const SNAPSHOT_FILE_NAME = 'coach-snapshot.json';
 
-async function getGoogleAuth() {
+async function getGoogleAuth(refreshToken) {
+  if (refreshToken) {
+    const oauth2 = new google.auth.OAuth2(
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    );
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    return oauth2;
+  }
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
   let creds;
   try { creds = JSON.parse(raw); } catch {
@@ -22,7 +30,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    const { jobs } = JSON.parse(event.body);
+    const { jobs, refreshToken } = JSON.parse(event.body);
+    const token = refreshToken || process.env.GMAIL_REFRESH_TOKEN;
 
     // Strip sensitive data before saving
     const safeJobs = (jobs || []).map(j => ({
@@ -43,7 +52,7 @@ exports.handler = async (event) => {
     const snapshot = { jobs: safeJobs, updatedAt: new Date().toISOString() };
     const content = JSON.stringify(snapshot);
 
-    const auth = await getGoogleAuth();
+    const auth = await getGoogleAuth(token);
     const drive = google.drive({ version: 'v3', auth });
 
     const existing = await drive.files.list({
