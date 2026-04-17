@@ -768,9 +768,9 @@ function CoachView({ jobs: propJobs }) {
       <style>{CSS}</style>
       <div className="app">
         <header className="hdr">
-          <div className="hdr-l">
-            <div className="logo">SZ</div>
-            <div><div className="site-n">Job Search</div><div className="site-s">Sara de Zarraga — Coach View</div></div>
+          <div className="hdr-brand">
+            <div className="mono">SZ</div>
+            <div><div className="brand-t">Job Search</div><div className="brand-s">Sara de Zárraga — Coach View</div></div>
           </div>
         </header>
         <main className="main">
