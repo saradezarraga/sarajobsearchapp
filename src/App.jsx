@@ -738,11 +738,11 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 }
 
 function CoachView({ jobs: propJobs }) {
-  const [jobs, setJobs] = React.useState(propJobs || []);
-  const [updatedAt, setUpdatedAt] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [jobs, setJobs] = useState(propJobs || []);
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetch("/.netlify/functions/load-coach-snapshot")
       .then(r => r.json())
       .then(d => { setJobs(d.jobs || []); setUpdatedAt(d.updatedAt); setLoading(false); })
