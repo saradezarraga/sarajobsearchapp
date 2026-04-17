@@ -60,15 +60,18 @@ exports.handler = async (event) => {
       fields: 'files(id)'
     });
 
+    const { Readable } = require('stream');
+    const makeStream = () => { const s = new Readable(); s.push(content); s.push(null); return s; };
+
     if (existing.data.files.length > 0) {
       await drive.files.update({
         fileId: existing.data.files[0].id,
-        media: { mimeType: 'application/json', body: Buffer.from(content) }
+        media: { mimeType: 'application/json', body: makeStream() }
       });
     } else {
       await drive.files.create({
         requestBody: { name: SNAPSHOT_FILE_NAME, parents: [APP_FOLDER_ID], mimeType: 'application/json' },
-        media: { mimeType: 'application/json', body: Buffer.from(content) },
+        media: { mimeType: 'application/json', body: makeStream() },
         fields: 'id'
       });
     }

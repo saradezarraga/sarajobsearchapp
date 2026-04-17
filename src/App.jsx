@@ -924,12 +924,12 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, jobs, onSave }) {
         </div>
         <div className="ss"><div className="ss-t">Career Coach Access</div><div style={{ fontSize: 13, color: "var(--ink-l)", lineHeight: 1.7, marginBottom: 12 }}>Share a read-only view of your dashboard with your coach.</div><button className="btn btn-sec" onClick={async () => {
           try {
-            await fetch("/.netlify/functions/save-coach-snapshot", {
+            const snapRes = await fetch("/.netlify/functions/save-coach-snapshot", {
               method: "POST", headers: {"Content-Type": "application/json"},
               body: JSON.stringify({ jobs, refreshToken: localStorage.getItem("gmail_refresh_token") })
             });
             const snapData = await snapRes.json();
-            if (snapData.error) throw new Error("Snapshot save failed: " + snapData.error);
+            if (!snapRes.ok || snapData.error) throw new Error("Snapshot save failed: " + (snapData.error || snapRes.status));
             await navigator.clipboard.writeText(window.location.origin + "/coach");
             alert("✓ Coach view link copied! Share this URL with your coach:\n" + window.location.origin + "/coach");
           } catch (e) { alert("Failed: " + e.message); }
