@@ -730,7 +730,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           )}
 
           {view === "coach" && <CoachView jobs={jobs} />}
-          {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} gmailConnected={gmailConnected} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
+          {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} gmailConnected={gmailConnected} jobs={jobs} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
         </main>
       </div>
     </>
@@ -815,7 +815,7 @@ function CoachView({ jobs: propJobs }) {
   );
 }
 
-function SettingsView({ hunterKey, liContacts, gmailConnected, onSave }) {
+function SettingsView({ hunterKey, liContacts, gmailConnected, jobs, onSave }) {
   const [k, setK] = useState(hunterKey);
   const [contacts, setContacts] = useState(liContacts);
   const [saved, setSaved] = useState(false);
