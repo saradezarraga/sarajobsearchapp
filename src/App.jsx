@@ -787,14 +787,14 @@ function CoachView({ jobs: propJobs }) {
             <div className="tbl">
               <div className="tbl-h"><span>Company / Role</span><span>Date</span><span>Status</span><span>Contacts</span><span>Sequence</span><span /></div>
               {jobs.map(j => (
-                <div key={j.id} className="tbl-r" onClick={() => setExpanded(expanded === j.id ? null : j.id)} style={{cursor:"pointer"}}>
-                  <div className="j-main">
-                    <div className="j-cr"><div className="j-co">{j.company}</div><div className="j-ro">{j.role}</div></div>
-                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{j.date}</div>
-                    <div style={{display:"flex",alignItems:"center"}}><span className={`badge b-${j.status === "active" ? "active" : j.status || "draft"}`}>{j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status === "complete" ? "✓ Complete" : "Draft"}</span></div>
-                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{(j.contacts || []).length} contact{(j.contacts || []).length !== 1 ? "s" : ""}</div>
-                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{(j.contacts || []).filter(c => ["sent","replied"].includes(c.status)).length} / {(j.contacts || []).length} sent</div>
-                    <button className="exp-btn">{expanded === j.id ? "▲" : "▼"}</button>
+                <div key={j.id} className="jr">
+                  <div className="jr-main" onClick={() => setExpanded(expanded === j.id ? null : j.id)}>
+                    <div><div className="j-co">{j.company}</div><div className="j-ro">{j.role}</div></div>
+                    <div className="j-dt">{j.date}</div>
+                    <div><span className={`badge b-${j.status === "active" ? "active" : j.status || "draft"}`}>{j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status === "complete" ? "✓ Complete" : "Draft"}</span></div>
+                    <div className="j-cc">{(j.contacts || []).length} contact{(j.contacts || []).length !== 1 ? "s" : ""}</div>
+                    <div className="j-cc">{(j.contacts || []).filter(c => ["sent","replied"].includes(c.status)).length} / {(j.contacts || []).length} sent</div>
+                    <button className="exp-btn" onClick={e => { e.stopPropagation(); setExpanded(expanded === j.id ? null : j.id); }}>{expanded === j.id ? "▲" : "▼"}</button>
                   </div>
                   {expanded === j.id && (
                     <div className="jd-detail">
