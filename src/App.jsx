@@ -497,7 +497,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           {view === "dashboard" && (
             <>
               <div className="flex-bw mb28">
-                <div><div className="pg-t">Applications</div><div className="pg-s">Track every outreach. Nothing falls through.</div></div>
+                <div><div className="pg-t">Sara de Zarraga's Applications</div><div className="pg-s">Track every outreach. Nothing falls through.</div></div>
                 <button className="btn btn-pri" onClick={() => { setView("new"); setStep(0); }}>+ New Application</button>
               </div>
               <div className="stats">
@@ -774,7 +774,7 @@ function CoachView({ jobs: propJobs }) {
           </div>
         </header>
         <main className="main">
-          <div className="pg-t" style={{marginBottom:4}}>Applications</div>
+          <div className="pg-t" style={{marginBottom:4}}>Sara de Zarraga's Applications</div>
           <div className="pg-s" style={{marginBottom:4}}>Read-only view{updatedAt ? ` · Updated ${new Date(updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}` : ""}</div>
           <div className="stats">
             {[["Total Applied","total"],["Active Sequences","active"],["Responses","responses"],["Need Attention","attention"]].map(([label,key]) => (
@@ -790,10 +790,10 @@ function CoachView({ jobs: propJobs }) {
                 <div key={j.id} className="tbl-r" onClick={() => setExpanded(expanded === j.id ? null : j.id)} style={{cursor:"pointer"}}>
                   <div className="j-main">
                     <div className="j-cr"><div className="j-co">{j.company}</div><div className="j-ro">{j.role}</div></div>
-                    <div className="j-cc">{j.date}</div>
-                    <div><span className={`badge b-${j.status === "active" ? "active" : j.status || "draft"}`}>{j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status === "complete" ? "✓ Complete" : "Draft"}</span></div>
-                    <div className="j-cc">{(j.contacts || []).length} contact{(j.contacts || []).length !== 1 ? "s" : ""}</div>
-                    <div className="j-cc">{(j.contacts || []).filter(c => ["sent","replied"].includes(c.status)).length} / {(j.contacts || []).length} sent</div>
+                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{j.date}</div>
+                    <div style={{display:"flex",alignItems:"center"}}><span className={`badge b-${j.status === "active" ? "active" : j.status || "draft"}`}>{j.status === "active" ? "● Active" : j.status === "paused" ? "⏸ Paused" : j.status === "complete" ? "✓ Complete" : "Draft"}</span></div>
+                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{(j.contacts || []).length} contact{(j.contacts || []).length !== 1 ? "s" : ""}</div>
+                    <div className="j-cc" style={{display:"flex",alignItems:"center"}}>{(j.contacts || []).filter(c => ["sent","replied"].includes(c.status)).length} / {(j.contacts || []).length} sent</div>
                     <button className="exp-btn">{expanded === j.id ? "▲" : "▼"}</button>
                   </div>
                   {expanded === j.id && (
