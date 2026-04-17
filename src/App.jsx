@@ -746,7 +746,13 @@ function CoachView({ jobs: propJobs }) {
   useEffect(() => {
     fetch("/.netlify/functions/load-coach-snapshot")
       .then(r => r.json())
-      .then(d => { setJobs(d.jobs || []); setUpdatedAt(d.updatedAt); setLoading(false); })
+      .then(d => {
+        // If snapshot has jobs use them, otherwise fall back to propJobs (localStorage)
+        const snapshotJobs = d.jobs || [];
+        setJobs(snapshotJobs.length > 0 ? snapshotJobs : (propJobs || []));
+        setUpdatedAt(d.updatedAt);
+        setLoading(false);
+      })
       .catch(() => { setJobs(propJobs || []); setLoading(false); });
   }, []);
 
@@ -922,6 +928,8 @@ function SettingsView({ hunterKey, liContacts, gmailConnected, jobs, onSave }) {
               method: "POST", headers: {"Content-Type": "application/json"},
               body: JSON.stringify({ jobs, refreshToken: localStorage.getItem("gmail_refresh_token") })
             });
+            const snapData = await snapRes.json();
+            if (snapData.error) throw new Error("Snapshot save failed: " + snapData.error);
             await navigator.clipboard.writeText(window.location.origin + "/coach");
             alert("✓ Coach view link copied! Share this URL with your coach:\n" + window.location.origin + "/coach");
           } catch (e) { alert("Failed: " + e.message); }
