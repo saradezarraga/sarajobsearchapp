@@ -13,7 +13,7 @@ async function getGoogleAuth(refreshToken) {
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET
     );
-    oauth2.setCredentials({ refresh_token: refreshToken });
+    oauth2.setCredentials({ refresh_token: refreshToken, scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive' });
     return oauth2;
   }
   // Fallback: service account (read-only operations only)

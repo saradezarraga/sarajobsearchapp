@@ -6,11 +6,13 @@ async function getGmailAccessToken(refreshToken) {
       refresh_token: refreshToken,
       client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
       client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      grant_type: 'refresh_token'
+      grant_type: 'refresh_token',
+      scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive'
     }).toString()
   });
   const tokens = await res.json();
   if (tokens.error) throw new Error('Failed to refresh token: ' + (tokens.error_description || tokens.error));
+  if (!tokens.access_token) throw new Error('No access token in response: ' + JSON.stringify(tokens));
   return tokens.access_token;
 }
 
