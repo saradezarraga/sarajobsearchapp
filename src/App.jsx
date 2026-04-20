@@ -454,7 +454,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         status: "active",
         contacts: withEmails.map((c, i) => ({ ...c, sequencePos: i + 1, status: i === 0 ? "sent" : "pending", sentAt: i === 0 ? new Date().toISOString() : null })),
         coreSkills: skills, tailoredResume: tailored, emailDrafts: drafts.map(d => d.edited),
-        driveDocxUrl: driveLinks.docxUrl, drivePdfUrl: driveLinks.pdfUrl,
+        driveDocxUrl: driveLinks.docxUrl, drivePdfUrl: driveLinks.pdfUrl, driveDocxId: driveLinks.docxId || null,
         createdAt: new Date().toISOString(),
       };
       const newJobs = [newJob, ...jobs];
@@ -550,7 +550,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                                       const draft = j.emailDrafts?.[i] || j.emailDrafts?.[0] || "";
                                       const res = await fetch("/.netlify/functions/send-email", {
                                         method: "POST", headers: {"Content-Type":"application/json"},
-                                        body: JSON.stringify({ to: c.email, subject: `Introduction - ${j.role} at ${j.company}`, body: draft, docxId: null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                                        body: JSON.stringify({ to: c.email, subject: `Introduction - ${j.role} at ${j.company}`, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
                                       });
                                       const data = await res.json();
                                       if (data.error) { alert("Send failed: " + data.error); return; }
