@@ -101,7 +101,22 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { resumeText, company, role, refreshToken } = JSON.parse(event.body);
+    const body = JSON.parse(event.body);
+    const { resumeText, company, role, refreshToken, reexportOnly, docxId: reexportDocxId } = body;
+
+    // Re-export only mode: just export existing docx as PDF
+    if (reexportOnly && reexportDocxId) {
+      const token = refreshToken || process.env.GMAIL_REFRESH_TOKEN || null;
+      const auth = await getGoogleAuth(token);
+      const drive = google.drive({ version: 'v3', auth });
+      const pdfRes = await drive.files.export(
+        { fileId: reexportDocxId, mimeType: 'application/pdf' },
+        { responseType: 'arraybuffer' }
+      );
+      const pdfBase64 = Buffer.from(pdfRes.data).toString('base64');
+      return { statusCode: 200, headers, body: JSON.stringify({ pdfBase64 }) };
+    }
+
     if (!resumeText) throw new Error('No resume text provided');
 
     const { headline, accomplishments } = parseTailoredSections(resumeText);
