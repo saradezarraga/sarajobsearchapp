@@ -15,20 +15,6 @@ async function getAccessToken(refreshToken) {
   return tokens.access_token;
 }
 
-async function exportPdfFromDrive(docxId, accessToken) {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${docxId}/export?mimeType=application%2Fpdf`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Drive export ${res.status}: ${errText.substring(0, 200)}`);
-  }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length < 1000) throw new Error('PDF export returned empty data');
-  return buf.toString('base64');
-}
-
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
   const boundary = 'boundary_' + Date.now();
   const lines = [
@@ -79,11 +65,8 @@ exports.handler = async (event) => {
 
     const accessToken = await getAccessToken(token);
 
-    // Use pdfBase64 if passed directly (new flow), otherwise fetch from Drive (legacy/edit flow)
+    // Use pdfBase64 passed directly from generate-resume
     let pdfBase64 = incomingPdfBase64 || null;
-    if (!pdfBase64 && docxId) {
-      pdfBase64 = await exportPdfFromDrive(docxId, accessToken);
-    }
 
     const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
     const encoded = Buffer.from(rawMime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
