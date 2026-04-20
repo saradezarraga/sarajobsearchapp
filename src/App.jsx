@@ -330,7 +330,9 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
   const step2 = () => {
     const fd = fdMatches.filter((_, i) => selFd[i]).map(c => ({ name: c.fullName, title: c.title, dept: c.company, email: c.email || null, type: "first_degree", status: "pending" }));
-    setOrdered([...fd, ...manContacts.map(c => ({ ...c, status: "pending" }))]);
+    const newOrdered = [...fd, ...manContacts.map(c => ({ ...c, status: "pending" }))];
+    setOrdered(newOrdered);
+    localStorage.setItem('jsa_draft', JSON.stringify({ jdText, jdUrl, company, role, skills, tailored, ordered: newOrdered, fdMatches, step: 4 }));
     setStep(4);
   };
 
@@ -441,7 +443,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
 
         return { contact: c, draft, edited: draft, editing: true, subject: subjectLine };
       }));
-      setDrafts(results); setLoading(false); setStep(5);
+      setDrafts(results); setLoading(false); localStorage.setItem('jsa_draft', JSON.stringify({ jdText, jdUrl, company, role, skills, tailored, ordered, fdMatches, step: 5 })); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }
   };
 
