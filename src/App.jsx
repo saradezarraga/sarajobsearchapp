@@ -371,27 +371,64 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
   };
 
   const step5 = async () => {
-    setLoading(true); setLoadMsg("Drafting referral emails…");
-    // Load saved email templates from Drive if available
-    let templateContext = "";
+    setLoading(true); setLoadMsg("Loading email template…");
+    // Load saved email templates from Drive
+    let savedTemplate = "";
+    let savedSubject = "";
     try {
       const tplRes = await fetch("/.netlify/functions/load-email-templates");
       const tplData = await tplRes.json();
       if (tplData.content) {
-        templateContext = `\n\nSAVED EMAIL TEMPLATES (use these as your base language, adapt for this specific contact/company):\n${tplData.content}`;
         setSavedTemplates(tplData.content);
+        // Extract the email body from the template (everything after the Subject line)
+        const bodyMatch = tplData.content.match(/Subject:[^
+]*
++([\s\S]*?)(?:────|$)/);
+        const subjMatch = tplData.content.match(/Subject:\s*(.+)/);
+        if (bodyMatch) savedTemplate = bodyMatch[1].trim();
+        if (subjMatch) savedSubject = subjMatch[1].trim();
       }
-    } catch (e) { /* no templates saved yet, generate fresh */ }
+    } catch (e) { /* no templates saved yet */ }
+
     try {
       const results = await Promise.all(ordered.map(async c => {
-        const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
-        const d = await callClaude(
-          `Write warm, concise referral emails for Sara de Zárraga. Sara: Harvard MBA (HBS), Wellesley undergrad, UBS banking → World Bank IFC → founded/exited Flare (VC wearable tech). Write in her voice: confident, genuine, not corporate.`,
-          `Email to ${c.name}${c.title ? " (" + c.title + ")" : ""} at ${company}. Role: ${role}. Relationship: ${rel}. Under 150 words. Ask for referral. Mention shared HBS/Wellesley if alumni. Be human.`,
-          600
-        );
-        const subjectLine = `Introduction - ${role} at ${company}`;
-        return { contact: c, draft: d, edited: d, editing: true, subject: subjectLine };
+        let draft, subjectLine;
+
+        if (savedTemplate) {
+          // Use saved template, adapt name/company/role via Claude
+          const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
+          const adapted = await callClaude(
+            `You adapt a saved email template for a specific contact. Keep the structure, tone, and language as close to the template as possible. Only change: the recipient name, company name, role title, and relationship context. Do not rewrite or improve — preserve Sara's exact voice and phrasing.`,
+            `TEMPLATE:
+${savedTemplate}
+
+Adapt for:
+Recipient: ${c.name}${c.title ? " (" + c.title + ")" : ""}
+Company: ${company}
+Role: ${role}
+Relationship: ${rel}
+
+Return only the email body, no subject line, no preamble.`,
+            400
+          );
+          draft = adapted;
+          // Adapt subject line too
+          subjectLine = savedSubject
+            .replace(/referral for .+ role/i, `referral for ${role} role`)
+            .replace(/at \w+$/i, `at ${company}`)
+            || `Introduction - ${role} at ${company}`;
+        } else {
+          // No template saved — generate fresh
+          const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
+          draft = await callClaude(
+            `Write warm, concise referral emails for Sara de Zárraga. Sara: Harvard MBA (HBS), Wellesley undergrad, UBS banking → World Bank IFC → founded/exited Flare (VC wearable tech). Write in her voice: confident, genuine, not corporate.`,
+            `Email to ${c.name}${c.title ? " (" + c.title + ")" : ""} at ${company}. Role: ${role}. Relationship: ${rel}. Under 150 words. Ask for referral. Mention shared HBS/Wellesley if alumni. Be human.`,
+            600
+          );
+          subjectLine = `Introduction - ${role} at ${company}`;
+        }
+
+        return { contact: c, draft, edited: draft, editing: true, subject: subjectLine };
       }));
       setDrafts(results); setLoading(false); setStep(5);
     } catch (e) { setLoading(false); alert(e.message); }
