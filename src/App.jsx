@@ -898,7 +898,13 @@ function CoachView({ jobs: propJobs }) {
                               <div className="cn">{i + 1}</div>
                               <div className="ci"><div className="c-n">{c.name}</div><div className="c-s">{c.title}</div></div>
                               <div className={`dot d-${c.status === "pending" ? "p" : c.status === "sent" ? "s" : c.status === "replied" ? "r" : c.status === "bounced" ? "b" : "nr"}`} />
-                              <span style={{fontSize:10,color:"var(--ink-l)",textTransform:"capitalize"}}>{c.status}{c.status === "sent" && c.sentAt ? ` ${new Date(c.sentAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}` : ""}</span>
+                              <span style={{fontSize:10,color:"var(--ink-l)",textTransform:"capitalize",cursor:c.status==="sent"?"pointer":"default"}} title={c.status==="sent"?"Mark as bounced if this email bounced":""} onClick={e => {
+                                if (c.status !== "sent") return;
+                                e.stopPropagation();
+                                if (!window.confirm(`Mark ${c.name}'s email as bounced?`)) return;
+                                const updated = jobs.map(jj => jj.id === j.id ? {...jj, contacts: jj.contacts.map((cc,ci) => ci===i ? {...cc, status:"bounced"} : cc)} : jj);
+                                setAndSaveJobs(updated);
+                              }}>{c.status}{c.status === "sent" && c.sentAt ? ` ${new Date(c.sentAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})}` : ""}{c.status==="sent" ? " ↓" : ""}</span>
                               {c.status === "bounced" && (
                                 <button className="btn btn-gh" style={{fontSize:10,padding:"2px 7px",marginLeft:4,color:"#d94a4a",borderColor:"#d94a4a"}} onClick={e => {
                                   e.stopPropagation();
