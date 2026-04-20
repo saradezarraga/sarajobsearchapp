@@ -385,7 +385,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         const subjIdx = lines.findIndex(l => l.trim().startsWith('Subject:'));
         if (subjIdx >= 0) {
           savedSubject = lines[subjIdx].replace(/^Subject:\s*/i, '').trim();
-          savedTemplate = lines.slice(subjIdx + 1).join('\n').split('\n').filter(l => !l.trim().startsWith('\u2500') && !l.trim().startsWith('-'.repeat(10))).join('\n').trim();
+          savedTemplate = lines.slice(subjIdx + 1).filter(l => l.trim().charCodeAt(0) !== 9472 && !l.trim().startsWith('--')).join('\n').trim();
         }
         if (savedTemplate savedTemplate = bodyMatch[1].trim();
         if (subjMatch) savedSubject = subjMatch[1].trim();
