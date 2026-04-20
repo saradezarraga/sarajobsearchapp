@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink)}
 .jd-detail{padding:16px 22px 20px;background:var(--gold-p);border-top:1px solid var(--border)}
 .d-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .dl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-l);font-weight:600;margin-bottom:8px}
-.cdr{display:flex;align-items:center;gap:8px;padding:7px 11px;background:var(--white);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;font-size:12px}
+.cdr{display:flex;align-items:center;gap:8px;padding:7px 11px;background:var(--white);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;font-size:12px;flex-wrap:wrap}
 .cn{width:18px;height:18px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--ink);flex-shrink:0}
 .ci{flex:1}.c-n{font-weight:600;font-size:12px}.c-s{font-size:10px;color:var(--ink-l)}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
