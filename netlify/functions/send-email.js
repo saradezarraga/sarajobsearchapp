@@ -1,4 +1,4 @@
-async function getGmailAccessToken(refreshToken) {
+async function getAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -10,9 +10,23 @@ async function getGmailAccessToken(refreshToken) {
     }).toString()
   });
   const tokens = await res.json();
-  if (tokens.error) throw new Error('Failed to refresh token: ' + (tokens.error_description || tokens.error));
-  if (!tokens.access_token) throw new Error('No access token returned');
+  if (tokens.error) throw new Error('Token refresh failed: ' + (tokens.error_description || tokens.error));
+  if (!tokens.access_token) throw new Error('No access token returned: ' + JSON.stringify(tokens));
   return tokens.access_token;
+}
+
+async function exportPdfFromDrive(docxId, accessToken) {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${docxId}/export?mimeType=application%2Fpdf`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Drive export ${res.status}: ${errText.substring(0, 200)}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length < 1000) throw new Error('PDF export returned empty data');
+  return buf.toString('base64');
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
@@ -57,20 +71,26 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { to, subject, body, pdfBase64, pdfFileName, refreshToken } = JSON.parse(event.body);
+    const { to, subject, body, pdfBase64: incomingPdfBase64, docxId, pdfFileName, refreshToken } = JSON.parse(event.body);
     if (!to || !subject || !body) throw new Error('Missing to, subject, or body');
 
     const token = process.env.GMAIL_REFRESH_TOKEN || refreshToken;
-    if (!token) throw new Error('Gmail not connected. Please connect Gmail in Settings first.');
+    if (!token) throw new Error('Gmail not connected.');
 
-    const accessToken = await getGmailAccessToken(token);
+    const accessToken = await getAccessToken(token);
 
-    const rawMime = buildMimeEmail({ to, subject, body, pdfBase64: pdfBase64 || null, pdfFileName });
+    // Use pdfBase64 if passed directly (new flow), otherwise fetch from Drive (legacy/edit flow)
+    let pdfBase64 = incomingPdfBase64 || null;
+    if (!pdfBase64 && docxId) {
+      pdfBase64 = await exportPdfFromDrive(docxId, accessToken);
+    }
+
+    const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
     const encoded = Buffer.from(rawMime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ raw: encoded })
     });
 
