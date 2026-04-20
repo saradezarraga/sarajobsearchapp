@@ -381,11 +381,13 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       if (tplData.content) {
         setSavedTemplates(tplData.content);
         // Extract the email body from the template (everything after the Subject line)
-        const bodyMatch = tplData.content.match(/Subject:[^
-]*
-+([\s\S]*?)(?:────|$)/);
-        const subjMatch = tplData.content.match(/Subject:\s*(.+)/);
-        if (bodyMatch) savedTemplate = bodyMatch[1].trim();
+        const lines = tplData.content.split('\n');
+        const subjIdx = lines.findIndex(l => l.trim().startsWith('Subject:'));
+        if (subjIdx >= 0) {
+          savedSubject = lines[subjIdx].replace(/^Subject:\s*/i, '').trim();
+          savedTemplate = lines.slice(subjIdx + 1).join('\n').replace(/^[\s\u2500]+/, '').trim();
+        }
+        if (savedTemplate savedTemplate = bodyMatch[1].trim();
         if (subjMatch) savedSubject = subjMatch[1].trim();
       }
     } catch (e) { /* no templates saved yet */ }
