@@ -11,8 +11,23 @@ async function getAccessToken(refreshToken) {
   });
   const tokens = await res.json();
   if (tokens.error) throw new Error('Token refresh failed: ' + (tokens.error_description || tokens.error));
-  if (!tokens.access_token) throw new Error('No access token returned: ' + JSON.stringify(tokens));
+  if (!tokens.access_token) throw new Error('No access token returned');
   return tokens.access_token;
+}
+
+async function exportPdfFromGoogleDoc(docId, accessToken) {
+  // Google Docs can always be exported as PDF — works on files you own
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application%2Fpdf`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Drive export ${res.status}: ${errText.substring(0, 300)}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length < 1000) throw new Error('PDF export returned empty data');
+  return buf.toString('base64');
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
@@ -57,7 +72,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { to, subject, body, pdfBase64: incomingPdfBase64, docxId, pdfFileName, refreshToken } = JSON.parse(event.body);
+    const { to, subject, body, docxId, pdfFileName, refreshToken } = JSON.parse(event.body);
     if (!to || !subject || !body) throw new Error('Missing to, subject, or body');
 
     const token = process.env.GMAIL_REFRESH_TOKEN || refreshToken;
@@ -65,8 +80,11 @@ exports.handler = async (event) => {
 
     const accessToken = await getAccessToken(token);
 
-    // Use pdfBase64 passed directly from generate-resume
-    let pdfBase64 = incomingPdfBase64 || null;
+    // Export latest PDF from Google Doc (reflects any edits you've made in Drive)
+    let pdfBase64 = null;
+    if (docxId) {
+      pdfBase64 = await exportPdfFromGoogleDoc(docxId, accessToken);
+    }
 
     const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
     const encoded = Buffer.from(rawMime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

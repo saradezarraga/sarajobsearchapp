@@ -222,25 +222,22 @@ exports.handler = async (event) => {
     const resumesFolderId = await findOrCreateFolder(drive, 'Resumes', APP_FOLDER_ID);
     const fileName = `SaradeZarraga-${company.replace(/[^a-zA-Z0-9]/g, '')}-${role.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-')}`;
 
-    // Copy master (uses owner's quota, not service account's)
-    const copied = await drive.files.copy({
-      fileId: MASTER_RESUME_ID,
-      requestBody: { name: fileName + '.docx', parents: [resumesFolderId] },
-      fields: 'id, webViewLink'
-    });
-    const docxId = copied.data.id;
-
-    // Update copy with edited content — pass Buffer directly, not a stream
-    await drive.files.update({
-      fileId: docxId,
+    // Upload docx as a Google Doc (conversion happens automatically)
+    // This allows Drive export API to work reliably for PDF generation
+    const created = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [resumesFolderId],
+        mimeType: 'application/vnd.google-apps.document'
+      },
       media: {
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        body: newDocBuffer  // Buffer directly — more reliable than Readable.from()
-      }
+        body: newDocBuffer
+      },
+      fields: 'id, webViewLink'
     });
-
-    const docxMeta = await drive.files.get({ fileId: docxId, fields: 'webViewLink' });
-    const docxUrl = docxMeta.data.webViewLink;
+    const docxId = created.data.id;
+    const docxUrl = created.data.webViewLink;
 
     // Export PDF — add small retry since Drive may not have processed the update yet
     let pdfBase64 = null;

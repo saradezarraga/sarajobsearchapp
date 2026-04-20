@@ -487,7 +487,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             to: firstContact.email,
             subject: firstDraft.subject || `Introduction - ${role} at ${company}`,
             body: firstDraft.edited,
-            pdfBase64: driveLinks.pdfBase64 || null,
+            docxId: driveLinks.docxId || null,
             pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`,
             refreshToken: localStorage.getItem("gmail_refresh_token") || null
           })
@@ -811,7 +811,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                   setLoading(true); setLoadMsg("Sending email…");
                   const res = await fetch("/.netlify/functions/send-email", {
                     method: "POST", headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({ to: c.email, subject, body: draft, pdfBase64: j.drivePdfBase64 || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
                   });
                   const data = await res.json();
                   setLoading(false);
@@ -955,7 +955,7 @@ function CoachView({ jobs: propJobs }) {
                   setLoading(true); setLoadMsg("Sending email…");
                   const res = await fetch("/.netlify/functions/send-email", {
                     method: "POST", headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({ to: c.email, subject, body: draft, pdfBase64: j.drivePdfBase64 || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
                   });
                   const data = await res.json();
                   setLoading(false);
