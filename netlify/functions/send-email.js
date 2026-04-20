@@ -1,3 +1,5 @@
+const { google } = require('googleapis');
+
 async function getGmailAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -6,26 +8,34 @@ async function getGmailAccessToken(refreshToken) {
       refresh_token: refreshToken,
       client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
       client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      grant_type: 'refresh_token',
-      scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive'
+      grant_type: 'refresh_token'
     }).toString()
   });
   const tokens = await res.json();
   if (tokens.error) throw new Error('Failed to refresh token: ' + (tokens.error_description || tokens.error));
-  if (!tokens.access_token) throw new Error('No access token in response: ' + JSON.stringify(tokens));
+  if (!tokens.access_token) throw new Error('No access token returned');
   return tokens.access_token;
 }
 
-async function getPdfFromDrive(docxId, accessToken) {
-  // Export the docx as PDF using the user's OAuth access token
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${docxId}/export?mimeType=application/pdf`,
-    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+async function getPdfFromDrive(docxId) {
+  // Use service account for Drive read - it has editor access to the Job Search App folder
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
+  let creds;
+  try { creds = JSON.parse(raw); } catch {
+    creds = JSON.parse(raw.replace(/\\n/g, '\n'));
+  }
+  const auth = new google.auth.GoogleAuth({
+    credentials: creds,
+    scopes: ['https://www.googleapis.com/auth/drive.readonly']
+  });
+  const drive = google.drive({ version: 'v3', auth });
+  const res = await drive.files.export(
+    { fileId: docxId, mimeType: 'application/pdf' },
+    { responseType: 'arraybuffer' }
   );
-  if (!res.ok) throw new Error(`Drive export failed: ${res.status} ${res.statusText}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.length < 1000) throw new Error('PDF too small, likely an error response');
-  return buffer.toString('base64');
+  const buf = Buffer.from(res.data);
+  if (buf.length < 1000) throw new Error('PDF export returned empty or invalid data');
+  return buf.toString('base64');
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
@@ -76,16 +86,15 @@ exports.handler = async (event) => {
     const token = process.env.GMAIL_REFRESH_TOKEN || refreshToken;
     if (!token) throw new Error('Gmail not connected. Please connect Gmail in Settings first.');
 
-    // Get OAuth access token (used for both Gmail send AND Drive PDF export)
+    // Get Gmail access token (OAuth only needed for sending)
     const accessToken = await getGmailAccessToken(token);
 
-    // Fetch PDF from Drive using the same OAuth token
+    // Fetch PDF using service account (has editor access to the folder)
     let pdfBase64 = null;
     if (docxId) {
       try {
-        pdfBase64 = await getPdfFromDrive(docxId, accessToken);
+        pdfBase64 = await getPdfFromDrive(docxId);
       } catch (e) {
-        // Don't send without attachment — throw so user knows
         throw new Error('Could not attach resume PDF: ' + e.message);
       }
     }

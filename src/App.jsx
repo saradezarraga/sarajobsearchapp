@@ -198,6 +198,20 @@ export default function App() {
   const [liContacts, setLiContacts] = useState([]);
   const [driveContent, setDriveContent] = useState(null);
   const [step, setStep] = useState(0);
+
+  // Restore in-progress draft on load
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem('jsa_draft') || 'null');
+      if (draft && draft.company) {
+        setJdText(draft.jdText || ''); setJdUrl(draft.jdUrl || '');
+        setCompany(draft.company || ''); setRole(draft.role || '');
+        setSkills(draft.skills || []); setTailored(draft.tailored || '');
+        setOrdered(draft.ordered || []); setFdMatches(draft.fdMatches || []);
+        if (draft.step > 0) setStep(draft.step);
+      }
+    } catch {}
+  }, []);
   const [jdText, setJdText] = useState("");
   const [jdUrl, setJdUrl] = useState("");
   const [company, setCompany] = useState("");
@@ -309,6 +323,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         true
       );
       setTailored(res); setEditResume(false);
+      localStorage.setItem('jsa_draft', JSON.stringify({ jdText, jdUrl, company, role, skills, tailored: res, ordered, fdMatches, step: 1 }));
       setLoading(false); setStep(1);
     } catch (e) { setLoading(false); alert(e.message); }
   };
@@ -497,6 +512,7 @@ Return only the email body, no subject line, no preamble.`,
       };
       const newJobs = [newJob, ...jobs];
       setAndSaveJobs(newJobs);
+      localStorage.removeItem('jsa_draft');
       setStep(0); setJdText(""); setJdUrl(""); setCompany(""); setRole(""); setSkills([]); setFdMatches([]); setSelFd({}); setManContacts([]); setOrdered([]); setTailored(""); setDrafts([]);
       setLoading(false); setView("dashboard");
     } catch (e) { setLoading(false); alert(e.message); }
