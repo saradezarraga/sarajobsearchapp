@@ -738,25 +738,11 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                       )}
                       <div style={{background:"var(--gold-p)",border:"1px solid var(--border)",borderRadius:"var(--rs)",padding:"14px 16px",fontSize:13,color:"var(--ink-l)",marginBottom:16}}>
                         ✓ Your tailored resume is saved to your <strong>Job Search App / Resumes</strong> folder in Google Drive.<br/>
-                        Open it above, make any edits, then click <strong>Re-export PDF</strong> to update the attachment before sending.
+                        Open it above and make any edits you want. The latest version will be attached to your emails automatically.
                       </div>
                       <div className="btn-row">
                         <button className="btn btn-gh" onClick={() => setStep(1)}>← Back to Edit</button>
-                        <button className="btn btn-sec" onClick={async () => {
-                          if (!driveLinks.docxId) { alert("No resume file found."); return; }
-                          setLoading(true); setLoadMsg("Re-exporting PDF from Drive…");
-                          try {
-                            const res = await fetch("/.netlify/functions/generate-resume", {
-                              method: "POST", headers: {"Content-Type":"application/json"},
-                              body: JSON.stringify({ reexportOnly: true, docxId: driveLinks.docxId, refreshToken: localStorage.getItem("gmail_refresh_token") })
-                            });
-                            const data = await res.json();
-                            if (data.error) throw new Error(data.error);
-                            setDriveLinks(prev => ({...prev, pdfBase64: data.pdfBase64}));
-                            setLoading(false);
-                            alert("✓ PDF updated from your edited resume.");
-                          } catch(e) { setLoading(false); alert("Re-export failed: " + e.message); }
-                        }}>🔄 Re-export PDF</button>
+
                         <button className="btn btn-pri" onClick={() => setStep(3)}>Looks Good — Add Contacts →</button>
                       </div>
                     </>
