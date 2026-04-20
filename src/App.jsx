@@ -376,7 +376,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       });
       const saveData = await saveRes.json();
       if (saveData.error) throw new Error(saveData.error);
-      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, docxId: saveData.docxId || null });
+      setDriveLinks({ docxUrl: saveData.docxUrl, pdfUrl: saveData.pdfUrl, fileName: saveData.fileName, docxId: saveData.docxId || null, pdfBase64: saveData.pdfBase64 || null });
       setLoading(false);
       setStep(2);
     } catch (e) {
@@ -487,7 +487,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
             to: firstContact.email,
             subject: firstDraft.subject || `Introduction - ${role} at ${company}`,
             body: firstDraft.edited,
-            docxId: driveLinks.docxId || null,
+            pdfBase64: driveLinks.pdfBase64 || null,
             pdfFileName: driveLinks.fileName ? driveLinks.fileName + ".pdf" : `${company} — ${role}.pdf`,
             refreshToken: localStorage.getItem("gmail_refresh_token") || null
           })
@@ -503,7 +503,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         status: "active",
         contacts: withEmails.map((c, i) => ({ ...c, sequencePos: i + 1, status: i === 0 ? "sent" : "pending", sentAt: i === 0 ? new Date().toISOString() : null })),
         coreSkills: skills, tailoredResume: tailored, emailDrafts: drafts.map(d => d.edited),
-        driveDocxUrl: driveLinks.docxUrl, drivePdfUrl: driveLinks.pdfUrl, driveDocxId: driveLinks.docxId || null,
+        driveDocxUrl: driveLinks.docxUrl, drivePdfUrl: driveLinks.pdfUrl, driveDocxId: driveLinks.docxId || null, drivePdfBase64: driveLinks.pdfBase64 || null,
         createdAt: new Date().toISOString(),
       };
       const newJobs = [newJob, ...jobs];
@@ -809,7 +809,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                   setLoading(true); setLoadMsg("Sending email…");
                   const res = await fetch("/.netlify/functions/send-email", {
                     method: "POST", headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                    body: JSON.stringify({ to: c.email, subject, body: draft, pdfBase64: j.drivePdfBase64 || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
                   });
                   const data = await res.json();
                   setLoading(false);
@@ -953,7 +953,7 @@ function CoachView({ jobs: propJobs }) {
                   setLoading(true); setLoadMsg("Sending email…");
                   const res = await fetch("/.netlify/functions/send-email", {
                     method: "POST", headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                    body: JSON.stringify({ to: c.email, subject, body: draft, pdfBase64: j.drivePdfBase64 || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
                   });
                   const data = await res.json();
                   setLoading(false);

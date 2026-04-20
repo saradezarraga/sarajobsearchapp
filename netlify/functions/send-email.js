@@ -1,5 +1,3 @@
-const { google } = require('googleapis');
-
 async function getGmailAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -15,27 +13,6 @@ async function getGmailAccessToken(refreshToken) {
   if (tokens.error) throw new Error('Failed to refresh token: ' + (tokens.error_description || tokens.error));
   if (!tokens.access_token) throw new Error('No access token returned');
   return tokens.access_token;
-}
-
-async function getPdfFromDrive(docxId) {
-  // Use service account for Drive read - it has editor access to the Job Search App folder
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-  let creds;
-  try { creds = JSON.parse(raw); } catch {
-    creds = JSON.parse(raw.replace(/\\n/g, '\n'));
-  }
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/drive.readonly']
-  });
-  const drive = google.drive({ version: 'v3', auth });
-  const res = await drive.files.export(
-    { fileId: docxId, mimeType: 'application/pdf' },
-    { responseType: 'arraybuffer' }
-  );
-  const buf = Buffer.from(res.data);
-  if (buf.length < 1000) throw new Error('PDF export returned empty or invalid data');
-  return buf.toString('base64');
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
@@ -80,26 +57,15 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
   try {
-    const { to, subject, body, docxId, pdfFileName, refreshToken } = JSON.parse(event.body);
+    const { to, subject, body, pdfBase64, pdfFileName, refreshToken } = JSON.parse(event.body);
     if (!to || !subject || !body) throw new Error('Missing to, subject, or body');
 
     const token = process.env.GMAIL_REFRESH_TOKEN || refreshToken;
     if (!token) throw new Error('Gmail not connected. Please connect Gmail in Settings first.');
 
-    // Get Gmail access token (OAuth only needed for sending)
     const accessToken = await getGmailAccessToken(token);
 
-    // Fetch PDF using service account (has editor access to the folder)
-    let pdfBase64 = null;
-    if (docxId) {
-      try {
-        pdfBase64 = await getPdfFromDrive(docxId);
-      } catch (e) {
-        throw new Error('Could not attach resume PDF: ' + e.message);
-      }
-    }
-
-    const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
+    const rawMime = buildMimeEmail({ to, subject, body, pdfBase64: pdfBase64 || null, pdfFileName });
     const encoded = Buffer.from(rawMime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
