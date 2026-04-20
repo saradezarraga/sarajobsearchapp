@@ -191,6 +191,7 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [sendPreview, setSendPreview] = useState(null); // { job, contact, contactIdx, draft, subject }
   const [loading, setLoading] = useState(false);
   const [loadMsg, setLoadMsg] = useState("");
   const [hunterKey, setHunterKey] = useState(DEFAULT_HUNTER_KEY);
@@ -544,19 +545,11 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                                   <div className={`dot d-${c.status === "pending" ? "p" : c.status === "sent" ? "s" : c.status === "replied" ? "r" : c.status === "bounced" ? "b" : "nr"}`} />
                                   <span style={{ fontSize: 10, color: "var(--ink-l)", textTransform: "capitalize" }}>{c.status}{c.status === "sent" && c.sentAt ? ` ${new Date(c.sentAt).toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'2-digit'})}` : ""}</span>
                                   {c.status === "pending" && c.email && (
-                                    <button className="btn btn-gh" style={{fontSize:11,padding:"2px 8px",marginLeft:8}} onClick={async e => {
+                                    <button className="btn btn-gh" style={{fontSize:11,padding:"2px 8px",marginLeft:8}} onClick={e => {
                                       e.stopPropagation();
-                                      if (!window.confirm(`Send email to ${c.name} now?`)) return;
                                       const draft = j.emailDrafts?.[i] || j.emailDrafts?.[0] || "";
-                                      const res = await fetch("/.netlify/functions/send-email", {
-                                        method: "POST", headers: {"Content-Type":"application/json"},
-                                        body: JSON.stringify({ to: c.email, subject: `Introduction - ${j.role} at ${j.company}`, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
-                                      });
-                                      const data = await res.json();
-                                      if (data.error) { alert("Send failed: " + data.error); return; }
-                                      const updated = jobs.map(jj => jj.id === j.id ? { ...jj, contacts: jj.contacts.map((cc, ci) => ci === i ? { ...cc, status: "sent", sentAt: new Date().toISOString() } : cc) } : jj);
-                                      setAndSaveJobs(updated);
-                                    }}>Send Now</button>
+                                      setSendPreview({ job: j, contact: c, contactIdx: i, draft, subject: `Introduction - ${j.role} at ${j.company}` });
+                                    }}>Preview & Send</button>
                                   )}
                                 </div>
                               ))}
@@ -732,6 +725,54 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           {view === "coach" && <CoachView jobs={jobs} />}
           {view === "settings" && <SettingsView hunterKey={hunterKey} liContacts={liContacts} gmailConnected={gmailConnected} jobs={jobs} onSave={(k, l) => { setHunterKey(k); setLiContacts(l); save(undefined, k, l); }} />}
         </main>
+
+        {/* Send Preview Modal */}
+        {sendPreview && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={() => setSendPreview(null)}>
+            <div style={{background:"var(--white)",borderRadius:12,width:"100%",maxWidth:600,maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}} onClick={e => e.stopPropagation()}>
+              <div style={{padding:"20px 24px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontWeight:700,fontSize:16,color:"var(--ink)"}}>Preview Email</div>
+                <button onClick={() => setSendPreview(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--ink-l)"}}>✕</button>
+              </div>
+              <div style={{padding:"16px 24px",borderBottom:"1px solid var(--border)",fontSize:13,color:"var(--ink-l)"}}>
+                <div style={{marginBottom:6}}><strong>To:</strong> {sendPreview.contact.name}{sendPreview.contact.title ? ` (${sendPreview.contact.title})` : ""} · {sendPreview.contact.email}</div>
+                <div><strong>Subject:</strong>
+                  <input
+                    value={sendPreview.subject}
+                    onChange={e => setSendPreview(p => ({...p, subject: e.target.value}))}
+                    style={{marginLeft:8,border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",fontSize:13,width:"70%",fontFamily:"inherit"}}
+                  />
+                </div>
+              </div>
+              <div style={{padding:"16px 24px",flex:1,overflowY:"auto"}}>
+                <textarea
+                  value={sendPreview.draft}
+                  onChange={e => setSendPreview(p => ({...p, draft: e.target.value}))}
+                  style={{width:"100%",minHeight:220,border:"1px solid var(--border)",borderRadius:8,padding:12,fontSize:13,lineHeight:1.7,fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}
+                />
+                <div style={{fontSize:11,color:"var(--ink-l)",marginTop:8}}>📎 Tailored resume PDF will be attached automatically.</div>
+              </div>
+              <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
+                <button className="btn btn-gh" onClick={() => setSendPreview(null)}>Cancel</button>
+                <button className="btn btn-pri" onClick={async () => {
+                  const { job: j, contact: c, contactIdx: i, draft, subject } = sendPreview;
+                  setSendPreview(null);
+                  setLoading(true); setLoadMsg("Sending email…");
+                  const res = await fetch("/.netlify/functions/send-email", {
+                    method: "POST", headers: {"Content-Type":"application/json"},
+                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                  });
+                  const data = await res.json();
+                  setLoading(false);
+                  if (data.error) { alert("Send failed: " + data.error); return; }
+                  const updated = jobs.map(jj => jj.id === j.id ? { ...jj, contacts: jj.contacts.map((cc, ci) => ci === i ? { ...cc, status: "sent", sentAt: new Date().toISOString() } : cc) } : jj);
+                  setAndSaveJobs(updated);
+                }}>Send Now →</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
@@ -828,6 +869,54 @@ function CoachView({ jobs: propJobs }) {
             </div>
           )}
         </main>
+
+        {/* Send Preview Modal */}
+        {sendPreview && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={() => setSendPreview(null)}>
+            <div style={{background:"var(--white)",borderRadius:12,width:"100%",maxWidth:600,maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}} onClick={e => e.stopPropagation()}>
+              <div style={{padding:"20px 24px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontWeight:700,fontSize:16,color:"var(--ink)"}}>Preview Email</div>
+                <button onClick={() => setSendPreview(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--ink-l)"}}>✕</button>
+              </div>
+              <div style={{padding:"16px 24px",borderBottom:"1px solid var(--border)",fontSize:13,color:"var(--ink-l)"}}>
+                <div style={{marginBottom:6}}><strong>To:</strong> {sendPreview.contact.name}{sendPreview.contact.title ? ` (${sendPreview.contact.title})` : ""} · {sendPreview.contact.email}</div>
+                <div><strong>Subject:</strong>
+                  <input
+                    value={sendPreview.subject}
+                    onChange={e => setSendPreview(p => ({...p, subject: e.target.value}))}
+                    style={{marginLeft:8,border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",fontSize:13,width:"70%",fontFamily:"inherit"}}
+                  />
+                </div>
+              </div>
+              <div style={{padding:"16px 24px",flex:1,overflowY:"auto"}}>
+                <textarea
+                  value={sendPreview.draft}
+                  onChange={e => setSendPreview(p => ({...p, draft: e.target.value}))}
+                  style={{width:"100%",minHeight:220,border:"1px solid var(--border)",borderRadius:8,padding:12,fontSize:13,lineHeight:1.7,fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}
+                />
+                <div style={{fontSize:11,color:"var(--ink-l)",marginTop:8}}>📎 Tailored resume PDF will be attached automatically.</div>
+              </div>
+              <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
+                <button className="btn btn-gh" onClick={() => setSendPreview(null)}>Cancel</button>
+                <button className="btn btn-pri" onClick={async () => {
+                  const { job: j, contact: c, contactIdx: i, draft, subject } = sendPreview;
+                  setSendPreview(null);
+                  setLoading(true); setLoadMsg("Sending email…");
+                  const res = await fetch("/.netlify/functions/send-email", {
+                    method: "POST", headers: {"Content-Type":"application/json"},
+                    body: JSON.stringify({ to: c.email, subject, body: draft, docxId: j.driveDocxId || null, pdfFileName: `SaradeZarraga-${j.company}-${j.role}.pdf`, refreshToken: localStorage.getItem("gmail_refresh_token") })
+                  });
+                  const data = await res.json();
+                  setLoading(false);
+                  if (data.error) { alert("Send failed: " + data.error); return; }
+                  const updated = jobs.map(jj => jj.id === j.id ? { ...jj, contacts: jj.contacts.map((cc, ci) => ci === i ? { ...cc, status: "sent", sentAt: new Date().toISOString() } : cc) } : jj);
+                  setAndSaveJobs(updated);
+                }}>Send Now →</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
