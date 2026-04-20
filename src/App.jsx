@@ -421,10 +421,13 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
           draft = savedTemplate.replace(/^Hi [^,]+,/m, 'Hi ' + firstName + ',');
           if (oldCo) draft = draft.split(oldCo).join(company);
           if (oldRo) draft = draft.split(oldRo).join(role);
-          subjectLine = savedSubject
-            .replace(/referral for .+ role/i, 'referral for ' + role + ' role')
-            .replace(/at [A-Za-z]+$/i, 'at ' + company)
-            || 'Introduction - ' + role + ' at ' + company;
+          // Rebuild subject from scratch using template structure
+          if (savedSubject.toLowerCase().includes('alum')) {
+            const alumType = savedSubject.match(/(wellesley|hbs)/i)?.[1] || 'Wellesley';
+            subjectLine = alumType + ' alum - referral for ' + role + ' role at ' + company;
+          } else {
+            subjectLine = 'Introduction - ' + role + ' at ' + company;
+          }
         } else {
           // No template saved — generate fresh
           const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
