@@ -410,28 +410,21 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
         let draft, subjectLine;
 
         if (savedTemplate) {
-          // Use saved template, adapt name/company/role via Claude
-          const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
-          const adapted = await callClaude(
-            `You adapt a saved email template for a specific contact. Keep the structure, tone, and language as close to the template as possible. Only change: the recipient name, company name, role title, and relationship context. Do not rewrite or improve — preserve Sara's exact voice and phrasing.`,
-            `TEMPLATE:
-${savedTemplate}
-
-Adapt for:
-Recipient: ${c.name}${c.title ? " (" + c.title + ")" : ""}
-Company: ${company}
-Role: ${role}
-Relationship: ${rel}
-
-Return only the email body, no subject line, no preamble.`,
-            400
-          );
-          draft = adapted;
-          // Adapt subject line too
+          // Use saved template — direct string replacement only, no Claude
+          const firstName = c.name.split(' ')[0];
+          const companyRe = /reviewing (\S+)'s website/i;
+          const roleRe = /opening for (?:a |an )?(.+?) role/i;
+          const cm = savedTemplate.match(companyRe) || savedTemplate.match(/at (\S+)\. It could/i);
+          const rm = savedTemplate.match(roleRe);
+          const oldCo = cm ? cm[1] : null;
+          const oldRo = rm ? rm[1] : null;
+          draft = savedTemplate.replace(/^Hi [^,]+,/m, 'Hi ' + firstName + ',');
+          if (oldCo) draft = draft.split(oldCo).join(company);
+          if (oldRo) draft = draft.split(oldRo).join(role);
           subjectLine = savedSubject
-            .replace(/referral for .+ role/i, `referral for ${role} role`)
-            .replace(/at \w+$/i, `at ${company}`)
-            || `Introduction - ${role} at ${company}`;
+            .replace(/referral for .+ role/i, 'referral for ' + role + ' role')
+            .replace(/at [A-Za-z]+$/i, 'at ' + company)
+            || 'Introduction - ' + role + ' at ' + company;
         } else {
           // No template saved — generate fresh
           const rel = c.type === "first_degree" ? "first-degree LinkedIn connection" : c.type === "both" ? "LinkedIn connection AND HBS/Wellesley alum" : "HBS or Wellesley alum — no prior connection";
