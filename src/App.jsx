@@ -223,6 +223,7 @@ export default function App() {
   const [newC, setNewC] = useState({ name: "", title: "", dept: "", linkedinUrl: "", type: "alumni" });
   const [ordered, setOrdered] = useState([]);
   const [tailored, setTailored] = useState("");
+  const [uploadedResumeFile, setUploadedResumeFile] = useState(null);
   const [editResume, setEditResume] = useState(false);
   const [drafts, setDrafts] = useState([]);
   const [dragI, setDragI] = useState(null);
@@ -271,6 +272,12 @@ export default function App() {
 
   const step1 = async () => {
     if ((!jdText.trim() && !jdUrl.trim()) || !company.trim() || !role.trim()) return;
+    // No Claude call — user uploads their own tailored resume from their Claude chat
+    setFdMatches(liContacts.filter(c => c.company?.toLowerCase().includes(company.toLowerCase())));
+    setSelFd({}); setManContacts([]);
+    setStep(1);
+    return;
+    // legacy code below — unreachable
     setLoading(true); setLoadMsg("Analyzing job description…");
     try {
       const raw = await callClaude(
@@ -280,8 +287,6 @@ export default function App() {
       let sk = [];
       try { sk = JSON.parse(raw.replace(/```json|```/g, "").trim()); } catch {}
       setSkills(sk);
-      setFdMatches(liContacts.filter(c => c.company?.toLowerCase().includes(company.toLowerCase())));
-      setSelFd({}); setManContacts([]);
       // Now tailor resume
       setLoadMsg("Loading documents and tailoring your resume…");
       const docs = await loadDrive();
@@ -367,6 +372,36 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
       alert("Gmail connection failed: " + (params.get("reason") || "Unknown error"));
     }
   }, []);
+
+  const uploadResumeToDrive = async () => {
+    if (!uploadedResumeFile) return;
+    const refreshToken = localStorage.getItem("gmail_refresh_token");
+    if (!refreshToken) { alert("Gmail not connected. Go to Settings to connect."); return; }
+    setLoading(true); setLoadMsg("Uploading resume to Drive…");
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(uploadedResumeFile);
+      });
+      const res = await fetch("/.netlify/functions/upload-resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docxBase64: base64, company, role, refreshToken })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setDriveLinks({ docxUrl: data.docxUrl, pdfUrl: null, fileName: data.fileName, docxId: data.docxId, pdfBase64: null });
+      setTailored("Uploaded: " + data.fileName);
+      localStorage.setItem('jsa_draft', JSON.stringify({ jdText, jdUrl, company, role, skills: [], tailored: "Uploaded: " + data.fileName, ordered, fdMatches, step: 2, driveLinks: { docxUrl: data.docxUrl, docxId: data.docxId, fileName: data.fileName } }));
+      setLoading(false);
+      setStep(2);
+    } catch (e) {
+      setLoading(false);
+      alert("Upload failed: " + e.message);
+    }
+  };
 
   const saveResumeToDrive = async () => {
     setLoading(true); setLoadMsg("Copying master resume and editing sections…");
@@ -655,7 +690,7 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                       </div>
                       <div className="fg"><label className="fl">Job Posting URL</label><input className="fi" value={jdUrl} onChange={e => setJdUrl(e.target.value)} placeholder="https://…" /><div className="fh">Or paste the job description below</div></div>
                       <div className="fg"><label className="fl">Job Description</label><textarea className="fi fta" value={jdText} onChange={e => setJdText(e.target.value)} placeholder="Paste the full job description here…" /></div>
-                      <div className="btn-row"><button className="btn btn-pri" onClick={step1} disabled={(!jdText.trim() && !jdUrl.trim()) || !company.trim() || !role.trim()}>Analyze & Tailor Resume →</button></div>
+                      <div className="btn-row"><button className="btn btn-pri" onClick={step1} disabled={(!jdText.trim() && !jdUrl.trim()) || !company.trim() || !role.trim()}>Next: Upload Tailored Resume →</button></div>
                     </>
                   )}
                   {step === 3 && (
@@ -719,13 +754,24 @@ Select 3-5 accomplishments based on role fit. Each title should mirror the job d
                   )}
                   {step === 1 && (
                     <>
-                      {skills.length > 0 && <div className="mb16"><div className="dl">Why I'll tailor your resume this way — {role} at {company}</div><div className="sk-grid mt8">{skills.map((s, i) => <div key={i} className="sk"><div className="sk-t">{s.title}</div><div className="sk-d">{s.desc}</div></div>)}</div></div>}
-                      <div className="flex-bw mb12">
-                        <div className="dl">Tailored Resume — {company}</div>
-                        <button className="btn btn-gh" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => setEditResume(!editResume)}>{editResume ? "Preview" : "✏ Edit"}</button>
+                      <div className="dl mb12">Upload Your Tailored Resume — {company}</div>
+                      <div style={{background:"var(--gold-p)",border:"1px solid var(--border)",borderRadius:"var(--rs)",padding:"14px 16px",fontSize:13,color:"var(--ink-l)",marginBottom:16}}>
+                        Tailor your resume for this role in your Claude chat, then upload the <strong>.docx</strong> file here. The app will save it to your Drive and attach it as a PDF to your outreach emails.
                       </div>
-                      {editResume ? <textarea className="r-edit" value={tailored} onChange={e => setTailored(e.target.value)} /> : <div className="r-prev" dangerouslySetInnerHTML={{__html: renderMarkdown(tailored)}} />}
-                      <div className="btn-row"><button className="btn btn-gh" onClick={() => setStep(0)}>← Back</button><button className="btn btn-pri" onClick={saveResumeToDrive}>Approve Text & Save Resume →</button></div>
+                      <div className="fg" style={{marginBottom:16}}>
+                        <label className="fl">Resume File (.docx)</label>
+                        <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) { setUploadedResumeFile(null); return; }
+                          if (!file.name.toLowerCase().endsWith('.docx')) { alert('Please upload a .docx file'); return; }
+                          setUploadedResumeFile(file);
+                        }} style={{padding:"10px 0",fontSize:13}} />
+                        {uploadedResumeFile && <div style={{fontSize:12,color:"var(--ink-l)",marginTop:6}}>✓ {uploadedResumeFile.name} ({Math.round(uploadedResumeFile.size/1024)} KB)</div>}
+                      </div>
+                      <div className="btn-row">
+                        <button className="btn btn-gh" onClick={() => setStep(0)}>← Back</button>
+                        <button className="btn btn-pri" disabled={!uploadedResumeFile} onClick={uploadResumeToDrive}>Upload & Continue →</button>
+                      </div>
                     </>
                   )}
                   {step === 2 && (
