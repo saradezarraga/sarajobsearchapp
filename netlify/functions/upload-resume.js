@@ -1,7 +1,3 @@
-const { google } = require('googleapis');
-const { Readable } = require('stream');
-
-const APP_FOLDER_ID = '1koBBe1Th7qmD2AAF3eljwNor8gPYcl5f';
 const RESUMES_FOLDER_ID = '1PnkZTP8NaTrekPiseZm_JJfUR37CuxSY';
 
 async function getUserAccessToken(refreshToken) {
