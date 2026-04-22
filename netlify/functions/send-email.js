@@ -1,3 +1,5 @@
+const { google } = require('googleapis');
+
 async function getAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -15,19 +17,68 @@ async function getAccessToken(refreshToken) {
   return tokens.access_token;
 }
 
-async function exportPdfFromGoogleDoc(docId, accessToken) {
-  // Google Docs can always be exported as PDF — works on files you own
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application%2Fpdf`,
+async function getPdfBase64(docxId, accessToken) {
+  // Get file metadata to check mimeType
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${docxId}?fields=mimeType`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Drive export ${res.status}: ${errText.substring(0, 300)}`);
+  if (!metaRes.ok) throw new Error(`Could not get file metadata: ${metaRes.status}`);
+  const meta = await metaRes.json();
+
+  if (meta.mimeType === 'application/vnd.google-apps.document') {
+    // Google Doc — export as PDF directly
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${docxId}/export?mimeType=application%2Fpdf`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) throw new Error(`Google Doc PDF export failed: ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 1000) throw new Error('PDF export returned empty data');
+    return buf.toString('base64');
+  } else {
+    // .docx or other binary — download it and convert using service account + Drive import trick
+    // Download the raw file
+    const dlRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${docxId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!dlRes.ok) throw new Error(`File download failed: ${dlRes.status}`);
+    const docxBuf = Buffer.from(await dlRes.arrayBuffer());
+
+    // Upload as Google Doc (conversion), export as PDF, then delete temp file
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
+    let creds;
+    try { creds = JSON.parse(raw); } catch { creds = JSON.parse(raw.replace(/\\n/g, '\n')); }
+    const auth = new google.auth.GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/drive'] });
+    const drive = google.drive({ version: 'v3', auth });
+
+    // Upload docx as Google Doc
+    const { Readable } = require('stream');
+    const stream = new Readable();
+    stream.push(docxBuf);
+    stream.push(null);
+    const uploaded = await drive.files.create({
+      requestBody: { name: 'temp_conversion', mimeType: 'application/vnd.google-apps.document' },
+      media: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', body: stream },
+      fields: 'id'
+    });
+    const tempId = uploaded.data.id;
+
+    try {
+      // Export as PDF
+      const pdfRes = await drive.files.export(
+        { fileId: tempId, mimeType: 'application/pdf' },
+        { responseType: 'arraybuffer' }
+      );
+      const pdfBuf = Buffer.from(pdfRes.data);
+      if (pdfBuf.length < 1000) throw new Error('PDF conversion returned empty data');
+      return pdfBuf.toString('base64');
+    } finally {
+      // Always delete the temp file
+      await drive.files.delete({ fileId: tempId }).catch(() => {});
+    }
   }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length < 1000) throw new Error('PDF export returned empty data');
-  return buf.toString('base64');
 }
 
 function buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName }) {
@@ -80,10 +131,9 @@ exports.handler = async (event) => {
 
     const accessToken = await getAccessToken(token);
 
-    // Export latest PDF from Google Doc (reflects any edits you've made in Drive)
     let pdfBase64 = null;
     if (docxId) {
-      pdfBase64 = await exportPdfFromGoogleDoc(docxId, accessToken);
+      pdfBase64 = await getPdfBase64(docxId, accessToken);
     }
 
     const rawMime = buildMimeEmail({ to, subject, body, pdfBase64, pdfFileName });
