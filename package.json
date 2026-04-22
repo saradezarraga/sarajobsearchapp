@@ -9,6 +9,7 @@
   "dependencies": {
     "@netlify/blobs": "^10.7.4",
     "docx": "^9.6.1",
+    "docx-pdf": "^0.0.1",
     "googleapis": "^171.4.0",
     "jszip": "^3.10.1",
     "react": "^18.2.0",

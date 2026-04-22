@@ -1,5 +1,3 @@
-const { google } = require('googleapis');
-
 async function getAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -18,66 +16,73 @@ async function getAccessToken(refreshToken) {
 }
 
 async function getPdfBase64(docxId, accessToken) {
-  // Get file metadata to check mimeType
+  // Check file type
   const metaRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${docxId}?fields=mimeType`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  if (!metaRes.ok) throw new Error(`Could not get file metadata: ${metaRes.status}`);
-  const meta = await metaRes.json();
+  if (!metaRes.ok) throw new Error(`Metadata fetch failed: ${metaRes.status}`);
+  const { mimeType } = await metaRes.json();
 
-  if (meta.mimeType === 'application/vnd.google-apps.document') {
-    // Google Doc — export as PDF directly
+  if (mimeType === 'application/vnd.google-apps.document') {
+    // Already a Google Doc — export directly
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${docxId}/export?mimeType=application%2Fpdf`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    if (!res.ok) throw new Error(`Google Doc PDF export failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Export failed: ${res.status} ${await res.text()}`);
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length < 1000) throw new Error('PDF export returned empty data');
     return buf.toString('base64');
-  } else {
-    // .docx or other binary — download it and convert using service account + Drive import trick
-    // Download the raw file
-    const dlRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${docxId}?alt=media`,
+  }
+
+  // .docx — download, upload as Google Doc (using user's OAuth = user's quota), export PDF, delete
+  const dlRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${docxId}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!dlRes.ok) throw new Error(`Download failed: ${dlRes.status}`);
+  const docxBuf = await dlRes.arrayBuffer();
+
+  // Upload as Google Doc using multipart upload with user's OAuth token
+  const boundary = 'upload_boundary_' + Date.now();
+  const metadata = JSON.stringify({ name: '_temp_pdf_conversion', mimeType: 'application/vnd.google-apps.document' });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n`),
+    Buffer.from(docxBuf),
+    Buffer.from(`\r\n--${boundary}--`)
+  ]);
+
+  const uploadRes = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary="${boundary}"`,
+        'Content-Length': body.length.toString()
+      },
+      body
+    }
+  );
+  if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status} ${await uploadRes.text()}`);
+  const { id: tempId } = await uploadRes.json();
+
+  try {
+    const pdfRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${tempId}/export?mimeType=application%2Fpdf`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    if (!dlRes.ok) throw new Error(`File download failed: ${dlRes.status}`);
-    const docxBuf = Buffer.from(await dlRes.arrayBuffer());
-
-    // Upload as Google Doc (conversion), export as PDF, then delete temp file
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-    let creds;
-    try { creds = JSON.parse(raw); } catch { creds = JSON.parse(raw.replace(/\\n/g, '\n')); }
-    const auth = new google.auth.GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/drive'] });
-    const drive = google.drive({ version: 'v3', auth });
-
-    // Upload docx as Google Doc
-    const { Readable } = require('stream');
-    const stream = new Readable();
-    stream.push(docxBuf);
-    stream.push(null);
-    const uploaded = await drive.files.create({
-      requestBody: { name: 'temp_conversion', mimeType: 'application/vnd.google-apps.document' },
-      media: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', body: stream },
-      fields: 'id'
-    });
-    const tempId = uploaded.data.id;
-
-    try {
-      // Export as PDF
-      const pdfRes = await drive.files.export(
-        { fileId: tempId, mimeType: 'application/pdf' },
-        { responseType: 'arraybuffer' }
-      );
-      const pdfBuf = Buffer.from(pdfRes.data);
-      if (pdfBuf.length < 1000) throw new Error('PDF conversion returned empty data');
-      return pdfBuf.toString('base64');
-    } finally {
-      // Always delete the temp file
-      await drive.files.delete({ fileId: tempId }).catch(() => {});
-    }
+    if (!pdfRes.ok) throw new Error(`PDF export of temp file failed: ${pdfRes.status}`);
+    const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
+    if (pdfBuf.length < 1000) throw new Error('PDF conversion returned empty data');
+    return pdfBuf.toString('base64');
+  } finally {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${tempId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }).catch(() => {});
   }
 }
 
